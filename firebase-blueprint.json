@@ -1,0 +1,49 @@
+{
+  "entities": {
+    "Registration": {
+      "title": "Registration",
+      "description": "Participant registration for the congress",
+      "type": "object",
+      "properties": {
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "idNumber": { "type": "string" },
+        "email": { "type": "string" },
+        "membershipType": { "type": "string", "enum": ["Joven", "Adulto"] },
+        "scoutGroup": { "type": "string" },
+        "bankReference": { "type": "string" },
+        "amount": { "type": "number" },
+        "paymentDate": { "type": "string" },
+        "proofUrl": { "type": "string" },
+        "adminStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "opsStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "adminObservations": { "type": "string" },
+        "opsObservations": { "type": "string" },
+        "checkedIn": { "type": "boolean" },
+        "checkInTime": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["firstName", "lastName", "idNumber", "email", "membershipType", "scoutGroup", "bankReference", "amount", "paymentDate"]
+    },
+    "Config": {
+      "title": "Global Config",
+      "description": "App configuration",
+      "type": "object",
+      "properties": {
+        "bankDetails": { "type": "string" },
+        "eventDate": { "type": "string" },
+        "eventLocation": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/registrations/{regId}": {
+      "schema": "Registration",
+      "description": "Collection of participant registrations"
+    },
+    "/config/{configId}": {
+      "schema": "Config",
+      "description": "Global configuration documents"
+    }
+  }
+}

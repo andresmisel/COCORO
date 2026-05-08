@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isValidRegistration(data) {
+      return data.firstName is string && data.firstName.size() > 0 
+          && data.lastName is string && data.lastName.size() > 0
+          && data.idNumber is string && data.idNumber.size() > 0
+          && data.email is string && data.email.size() > 0
+          && data.membershipType in ["Joven", "Adulto"]
+          && data.scoutGroup is string;
+    }
+
+    match /registrations/{regId} {
+      allow create: if isValidRegistration(request.resource.data);
+      allow get: if true; // Needed for public status check by ID
+      allow list: if true; // In production, restrict to authenticated staff
+      allow update: if true; // In production, restrict with roles
+      allow delete: if true; // Only Superadmin should do this
+    }
+
+    match /config/{configId} {
+      allow read: if true;
+      allow write: if true; // In production, restrict to Superadmin
+    }
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

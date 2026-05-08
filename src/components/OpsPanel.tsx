@@ -1,0 +1,264 @@
+import React, { useState, useEffect } from "react";
+import { Registration, Status } from "../types";
+import { updateDoc, doc, query, where, getDocs, collection } from "firebase/firestore";
+import { db } from "../lib/firebase";
+import { MessageSquare, Download, CheckCircle, XCircle, Clock, QrCode, UserCheck } from "lucide-react";
+import { handleFirestoreError, OperationType } from "../lib/error-handler";
+import { Html5QrcodeScanner } from "html5-qrcode";
+
+interface Props {
+  registrations: Registration[];
+  onExportAll: () => void;
+  onExportAttendees: () => void;
+}
+
+export default function OpsPanel({ registrations, onExportAll, onExportAttendees }: Props) {
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanResult, setScanResult] = useState<string | null>(null);
+  const [obsId, setObsId] = useState<string | null>(null);
+  const [obsText, setObsText] = useState("");
+
+  const updateStatus = async (id: string, status: Status) => {
+    try {
+      await updateDoc(doc(db, "registrations", id), { opsStatus: status });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, `registrations/${id}`);
+    }
+  };
+
+  const saveObservation = async (id: string) => {
+    try {
+      await updateDoc(doc(db, "registrations", id), { opsObservations: obsText });
+      setObsId(null);
+      setObsText("");
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, `registrations/${id}`);
+    }
+  };
+
+  const handleManualCheckIn = async (id: string) => {
+    try {
+      await updateDoc(doc(db, "registrations", id), { 
+        checkedIn: true, 
+        checkInTime: new Date().toISOString() 
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, `registrations/${id}`);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100 gap-4">
+        <h3 className="font-bold uppercase italic text-gray-500 text-xs tracking-widest pl-2">Validación Institutional & Acceso</h3>
+        <div className="flex flex-wrap gap-2">
+          <button 
+            onClick={() => setShowScanner(!showScanner)}
+            className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded-xl font-bold uppercase text-xs hover:bg-primary-dark transition-all shadow-lg shadow-primary/20"
+          >
+            <QrCode className="w-4 h-4" />
+            <span>{showScanner ? "Cerrar Escáner" : "Escanear QR"}</span>
+          </button>
+          <button 
+            onClick={onExportAll}
+            className="flex items-center space-x-2 border-2 border-gray-100 text-gray-600 px-4 py-2 rounded-xl font-bold uppercase text-xs hover:bg-gray-50 transition-all"
+          >
+            <Download className="w-4 h-4" />
+            <span>Inscritos</span>
+          </button>
+          <button 
+            onClick={onExportAttendees}
+            className="flex items-center space-x-2 border-2 border-gray-100 text-gray-600 px-4 py-2 rounded-xl font-bold uppercase text-xs hover:bg-gray-50 transition-all"
+          >
+            <UserCheck className="w-4 h-4" />
+            <span>Asistentes</span>
+          </button>
+        </div>
+      </div>
+
+      {showScanner && (
+        <div className="bg-black/90 p-6 rounded-3xl overflow-hidden relative min-h-[400px]">
+          <Scanner 
+            onScan={async (idNumber) => {
+              setScanResult(`Escaneado: V-${idNumber}`);
+              try {
+                const q = query(collection(db, "registrations"), where("idNumber", "==", idNumber));
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                  const regDoc = snap.docs[0];
+                  const regData = regDoc.data() as Registration;
+                  
+                  if (regData.checkedIn) {
+                    alert(`⚠️ ALERTA: El usuario ${regData.firstName} ${regData.lastName} YA SE ENCUENTRA EN EL EVENTO.\nEntrada registrada a las: ${new Date(regData.checkInTime!).toLocaleTimeString()}`);
+                    return;
+                  }
+
+                  if (regData.adminStatus === Status.APPROVED && regData.opsStatus === Status.APPROVED) {
+                    await updateDoc(doc(db, "registrations", regDoc.id), { 
+                      checkedIn: true, 
+                      checkInTime: new Date().toISOString() 
+                    });
+                    alert(`✅ ¡Acceso CONCEDIDO para ${regData.firstName} ${regData.lastName}!`);
+                  } else {
+                    alert(`❌ ACCESO DENEGADO: Verificaciones pendientes para ${regData.firstName}.`);
+                  }
+                } else {
+                  alert("❌ ERROR: No se encontró registro con este ID.");
+                }
+              } catch (e) {
+                console.error(e);
+              }
+            }} 
+          />
+          {scanResult && (
+            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-white/90 px-4 py-2 rounded-full font-bold text-xs uppercase tracking-widest text-primary">
+              {scanResult}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="px-6 py-4 text-xs font-bold uppercase text-gray-400 tracking-widest">Participante / Contacto</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase text-gray-400 tracking-widest">Institución</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase text-gray-400 tracking-widest text-center">Status Ops</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase text-gray-400 tracking-widest text-center">Asistencia</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase text-gray-400 tracking-widest text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {registrations.map((reg) => (
+                <tr key={reg.id} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="px-6 py-4">
+                    <p className="font-bold text-gray-900 uppercase text-sm">{reg.firstName} {reg.lastName}</p>
+                    <p className="text-[10px] text-gray-400 font-mono mb-1">V-{reg.idNumber}</p>
+                    <p className="text-xs text-primary font-medium">{reg.email}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-xs font-bold text-gray-800 uppercase">{reg.scoutGroup}</p>
+                    <p className="text-[10px] text-gray-500 uppercase">{reg.membershipType}</p>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                      reg.opsStatus === Status.APPROVED ? 'bg-blue-100 text-blue-600' : 
+                      reg.opsStatus === Status.REJECTED ? 'bg-red-100 text-red-600' : 
+                      'bg-amber-100 text-amber-600'
+                    }`}>
+                      {reg.opsStatus === Status.APPROVED ? 'Validado' : reg.opsStatus === Status.REJECTED ? 'Rechazado' : 'Pendiente'}
+                    </span>
+                    {reg.opsObservations && (
+                      <p className="text-[9px] text-gray-400 mt-1 italic max-w-[100px] mx-auto truncate">"{reg.opsObservations}"</p>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {reg.checkedIn ? (
+                      <div className="flex flex-col items-center">
+                        <span className="text-green-600 font-bold text-[10px] uppercase tracking-widest flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" /> PRESENTE
+                        </span>
+                        <span className="text-[9px] text-gray-400 font-mono">{reg.checkInTime ? new Date(reg.checkInTime).toLocaleTimeString() : ''}</span>
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => handleManualCheckIn(reg.id)}
+                        disabled={reg.adminStatus !== Status.APPROVED || reg.opsStatus !== Status.APPROVED}
+                        className="text-[10px] font-bold text-gray-400 border border-gray-200 px-2 py-0.5 rounded-full hover:bg-green-50 hover:text-green-600 hover:border-green-200 transition-all disabled:opacity-30 uppercase tracking-widest"
+                      >
+                        Marcar entrada
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end space-x-1">
+                      <button 
+                        onClick={() => { setObsId(reg.id); setObsText(reg.opsObservations || ""); }}
+                        className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                        title="Agregar Observación"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                      </button>
+                       <button 
+                        onClick={() => updateStatus(reg.id, Status.REJECTED)}
+                        disabled={reg.opsStatus === Status.REJECTED}
+                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all disabled:opacity-30"
+                        title="Rechazar"
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => updateStatus(reg.id, Status.APPROVED)}
+                        disabled={reg.opsStatus === Status.APPROVED}
+                        className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all disabled:opacity-30"
+                        title="Validar"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {/* Observation Modal */}
+      {obsId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-sm space-y-4 shadow-2xl">
+            <h4 className="font-bold uppercase italic text-blue-600">Agregar Observación Operativa</h4>
+            <textarea 
+              value={obsText}
+              onChange={(e) => setObsText(e.target.value)}
+              className="w-full h-32 p-3 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+              placeholder="Escriba aquí sus comentarios..."
+            />
+            <div className="flex gap-2">
+              <button 
+                onClick={() => { setObsId(null); setObsText(""); }}
+                className="flex-1 py-2 bg-gray-100 rounded-xl font-bold uppercase text-xs"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={() => saveObservation(obsId)}
+                className="flex-1 py-2 bg-blue-600 text-white rounded-xl font-bold uppercase text-xs"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Scanner({ onScan }: { onScan: (result: string) => void }) {
+  useEffect(() => {
+    const scanner = new Html5QrcodeScanner(
+      "reader",
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      /* verbose= */ false
+    );
+
+    scanner.render(
+      (decodedText) => {
+        onScan(decodedText);
+        // No detenemos para permitir escaneo continuo
+      },
+      (error) => {
+        // Ignorar errores de escaneo fallido (por ejemplo, cuando no hay QR en foco)
+      }
+    );
+
+    return () => {
+      scanner.clear();
+    };
+  }, []);
+
+  return <div id="reader" className="w-full h-full max-w-lg mx-auto bg-white rounded-2xl overflow-hidden" />;
+}

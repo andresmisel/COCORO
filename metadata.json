@@ -1,0 +1,6 @@
+{
+  "name": "COCORO ♥♥♥♥♥",
+  "description": "App oficial del Congreso de Comunidad Rover - Distrito Ávila 2026 para registro, validación y control de asistencia.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}
