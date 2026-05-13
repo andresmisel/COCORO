@@ -13,10 +13,18 @@ service cloud.firestore {
 
     match /registrations/{regId} {
       allow create: if isValidRegistration(request.resource.data);
-      allow get: if true; // Needed for public status check by ID
-      allow list: if true; // In production, restrict to authenticated staff
-      allow update: if true; // In production, restrict with roles
-      allow delete: if true; // Only Superadmin should do this
+      allow get: if true;
+      allow list: if true; 
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    match /payments/{paymentId} {
+      allow create: if true; // Allow public reporting of payments
+      allow get: if true;
+      allow list: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     match /config/{configId} {

@@ -70,7 +70,7 @@ export default function App() {
                 className={`hover:text-gray-200 transition-colors uppercase text-sm font-medium ${view === 'register' ? 'border-b-2 border-white' : ''}`}
                 id="nav-register"
               >
-                Inscripción
+                Registro y Cuotas
               </button>
               <button 
                 onClick={() => navigate("status")} 
@@ -97,7 +97,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Mobile menu */}
         <AnimatePresence>
           {isMenuOpen && (
             <motion.div 
@@ -107,7 +106,7 @@ export default function App() {
               className="md:hidden bg-primary-dark border-t border-primary-light"
             >
               <div className="px-4 py-4 space-y-3 flex flex-col">
-                <button onClick={() => navigate("register")} className="text-left py-2 font-medium">Inscripción</button>
+                <button onClick={() => navigate("register")} className="text-left py-2 font-medium">Registro y Cuotas</button>
                 <button onClick={() => navigate("status")} className="text-left py-2 font-medium">Consultar Status</button>
                 <button onClick={() => navigate("staff")} className="text-left py-2 font-medium font-bold italic">Acceso Staff</button>
               </div>
@@ -144,7 +143,7 @@ export default function App() {
                   id="home-btn-register"
                 >
                   <ClipboardCheck className="w-12 h-12" />
-                  <span className="text-2xl font-bold uppercase">Formulario de Registro</span>
+                  <span className="text-2xl font-bold uppercase">Formulario de Registro y Reporte de Cuotas</span>
                   <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
                 

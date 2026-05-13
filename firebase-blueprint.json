@@ -25,6 +25,26 @@
       },
       "required": ["firstName", "lastName", "idNumber", "email", "membershipType", "scoutGroup", "bankReference", "amount", "paymentDate"]
     },
+    "Payment": {
+      "title": "Payment",
+      "description": "Payment report for a registration",
+      "type": "object",
+      "properties": {
+        "idNumber": { "type": "string" },
+        "paymentMethod": { "type": "string", "enum": ["Transferencia/Pago Movil", "Efectivo"] },
+        "bankReference": { "type": "string" },
+        "receiptNumber": { "type": "string" },
+        "exchangeRate": { "type": "number" },
+        "amount": { "type": "number" },
+        "amountUSD": { "type": "number" },
+        "paymentDate": { "type": "string" },
+        "proofUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "adminObservations": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["idNumber", "paymentMethod", "amount", "amountUSD", "paymentDate", "status"]
+    },
     "Config": {
       "title": "Global Config",
       "description": "App configuration",
@@ -40,6 +60,10 @@
     "/registrations/{regId}": {
       "schema": "Registration",
       "description": "Collection of participant registrations"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Collection of payment reports"
     },
     "/config/{configId}": {
       "schema": "Config",

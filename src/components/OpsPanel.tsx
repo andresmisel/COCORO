@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Registration, Status } from "../types";
+import { Registration, Status, Payment, Config } from "../types";
 import { updateDoc, doc, query, where, getDocs, collection } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { MessageSquare, Download, CheckCircle, XCircle, Clock, QrCode, UserCheck } from "lucide-react";
@@ -8,11 +8,13 @@ import { Html5QrcodeScanner } from "html5-qrcode";
 
 interface Props {
   registrations: Registration[];
+  payments: Payment[];
+  config: Config | null;
   onExportAll: () => void;
   onExportAttendees: () => void;
 }
 
-export default function OpsPanel({ registrations, onExportAll, onExportAttendees }: Props) {
+export default function OpsPanel({ registrations, payments, config, onExportAll, onExportAttendees }: Props) {
   const [showScanner, setShowScanner] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [obsId, setObsId] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export default function OpsPanel({ registrations, onExportAll, onExportAttendees
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100 gap-4">
-        <h3 className="font-bold uppercase italic text-gray-500 text-xs tracking-widest pl-2">Validación Institutional & Acceso</h3>
+        <h3 className="font-bold uppercase italic text-gray-500 text-xs tracking-widest pl-2">Membresía & Control de Acceso</h3>
         <div className="flex flex-wrap gap-2">
           <button 
             onClick={() => setShowScanner(!showScanner)}
@@ -64,7 +66,7 @@ export default function OpsPanel({ registrations, onExportAll, onExportAttendees
             className="flex items-center space-x-2 border-2 border-gray-100 text-gray-600 px-4 py-2 rounded-xl font-bold uppercase text-xs hover:bg-gray-50 transition-all"
           >
             <Download className="w-4 h-4" />
-            <span>Inscritos</span>
+            <span>Base Inscritos</span>
           </button>
           <button 
             onClick={onExportAttendees}
@@ -93,14 +95,22 @@ export default function OpsPanel({ registrations, onExportAll, onExportAttendees
                     return;
                   }
 
-                  if (regData.adminStatus === Status.APPROVED && regData.opsStatus === Status.APPROVED) {
+                  // Check solvency
+                  const userPayments = payments.filter(p => p.idNumber === idNumber && p.status === Status.APPROVED);
+                  const totalPaid = userPayments.reduce((acc, p) => acc + p.amountUSD, 0);
+                  const rawMissing = config ? Math.max(0, config.totalCostUSD - totalPaid) : 0;
+                  const isCompletado = rawMissing < 0.01;
+
+                  if (isCompletado && regData.opsStatus === Status.APPROVED) {
                     await updateDoc(doc(db, "registrations", regDoc.id), { 
                       checkedIn: true, 
                       checkInTime: new Date().toISOString() 
                     });
                     alert(`✅ ¡Acceso CONCEDIDO para ${regData.firstName} ${regData.lastName}!`);
+                  } else if (!isCompletado) {
+                    alert(`❌ ACCESO DENEGADO: El participante no ha completado el pago (${totalPaid.toFixed(2)}/${config?.totalCostUSD || 0}).`);
                   } else {
-                    alert(`❌ ACCESO DENEGADO: Verificaciones pendientes para ${regData.firstName}.`);
+                    alert(`❌ ACCESO DENEGADO: Falta Validación Institucional para ${regData.firstName}.`);
                   }
                 } else {
                   alert("❌ ERROR: No se encontró registro con este ID.");
@@ -143,13 +153,28 @@ export default function OpsPanel({ registrations, onExportAll, onExportAttendees
                     <p className="text-[10px] text-gray-500 uppercase">{reg.membershipType}</p>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                      reg.opsStatus === Status.APPROVED ? 'bg-blue-100 text-blue-600' : 
-                      reg.opsStatus === Status.REJECTED ? 'bg-red-100 text-red-600' : 
-                      'bg-amber-100 text-amber-600'
-                    }`}>
-                      {reg.opsStatus === Status.APPROVED ? 'Validado' : reg.opsStatus === Status.REJECTED ? 'Rechazado' : 'Pendiente'}
-                    </span>
+                    <div className="flex flex-col items-center space-y-1.5">
+                      <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                        reg.opsStatus === Status.APPROVED ? 'bg-blue-100 text-blue-600' : 
+                        reg.opsStatus === Status.REJECTED ? 'bg-red-100 text-red-600' : 
+                        'bg-amber-100 text-amber-600'
+                      }`}>
+                        {reg.opsStatus === Status.APPROVED ? 'Vigente' : reg.opsStatus === Status.REJECTED ? 'Vencido' : 'Pendiente'}
+                      </span>
+                      {/* Solvency Indicator */}
+                      {(() => {
+                        const userPayments = payments.filter(p => p.idNumber === reg.idNumber && p.status === Status.APPROVED);
+                        const totalPaid = userPayments.reduce((acc, p) => acc + p.amountUSD, 0);
+                        const rawMissing = config ? Math.max(0, config.totalCostUSD - totalPaid) : 0;
+                        const missing = rawMissing < 0.01 ? 0 : rawMissing;
+                        const isCompletado = missing <= 0;
+                        return (
+                          <span className={`text-[9px] font-bold uppercase ${isCompletado ? 'text-green-600' : 'text-amber-500'}`}>
+                            {isCompletado ? '💰 Completado' : `💳 Falta $${missing.toFixed(2)}`}
+                          </span>
+                        );
+                      })()}
+                    </div>
                     {reg.opsObservations && (
                       <p className="text-[9px] text-gray-400 mt-1 italic max-w-[100px] mx-auto truncate">"{reg.opsObservations}"</p>
                     )}
@@ -165,7 +190,13 @@ export default function OpsPanel({ registrations, onExportAll, onExportAttendees
                     ) : (
                       <button 
                         onClick={() => handleManualCheckIn(reg.id)}
-                        disabled={reg.adminStatus !== Status.APPROVED || reg.opsStatus !== Status.APPROVED}
+                        disabled={
+                          (() => {
+                            const totalPaid = payments.filter(p => p.idNumber === reg.idNumber && p.status === Status.APPROVED).reduce((acc, p) => acc + p.amountUSD, 0);
+                            const rawMissing = config ? Math.max(0, config.totalCostUSD - totalPaid) : 0;
+                            return (rawMissing >= 0.01) || reg.opsStatus !== Status.APPROVED;
+                          })()
+                        }
                         className="text-[10px] font-bold text-gray-400 border border-gray-200 px-2 py-0.5 rounded-full hover:bg-green-50 hover:text-green-600 hover:border-green-200 transition-all disabled:opacity-30 uppercase tracking-widest"
                       >
                         Marcar entrada
@@ -185,7 +216,7 @@ export default function OpsPanel({ registrations, onExportAll, onExportAttendees
                         onClick={() => updateStatus(reg.id, Status.REJECTED)}
                         disabled={reg.opsStatus === Status.REJECTED}
                         className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all disabled:opacity-30"
-                        title="Rechazar"
+                        title="Marcar Vencido"
                       >
                         <XCircle className="w-4 h-4" />
                       </button>
@@ -193,7 +224,7 @@ export default function OpsPanel({ registrations, onExportAll, onExportAttendees
                         onClick={() => updateStatus(reg.id, Status.APPROVED)}
                         disabled={reg.opsStatus === Status.APPROVED}
                         className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all disabled:opacity-30"
-                        title="Validar"
+                        title="Marcar Vigente"
                       >
                         <CheckCircle className="w-4 h-4" />
                       </button>

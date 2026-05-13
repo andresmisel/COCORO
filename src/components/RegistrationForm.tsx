@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { collection, addDoc, doc, getDoc } from "firebase/firestore";
+import { collection, addDoc, doc, getDoc, query, where, getDocs, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { MembershipType, Status, PaymentMethod } from "../types";
+import { MembershipType, Status, PaymentMethod, Config } from "../types";
 import { handleFirestoreError, OperationType } from "../lib/error-handler";
-import { Loader2, CheckCircle2, ChevronLeft, CreditCard, Banknote } from "lucide-react";
+import { Loader2, CheckCircle2, ChevronLeft, CreditCard, Banknote, UserPlus, AlertCircle } from "lucide-react";
 
 const SCOUT_GROUPS = [
   "ARISTIDES ROJAS",
@@ -34,28 +34,30 @@ export default function RegistrationForm({ onBack }: Props) {
     paymentDate: new Date().toISOString().split('T')[0],
   });
   
-  const [config, setConfig] = useState({ bankDetails: "Cargando...", cashDetails: "Cargando..." });
+  const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingUser, setCheckingUser] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [proofData, setProofData] = useState<string | null>(null);
   const [proofName, setProofName] = useState<string | null>(null);
+  const [userExists, setUserExists] = useState(false);
+  const [deadlinePassed, setDeadlinePassed] = useState(false);
 
   useEffect(() => {
     const fetchConfig = async () => {
       try {
         const configDoc = await getDoc(doc(db, "config", "global"));
         if (configDoc.exists()) {
-          const data = configDoc.data();
-          setConfig({
-            bankDetails: data.bankDetails || "Datos de pago no disponibles.",
-            cashDetails: data.cashDetails || "Pago en efectivo coordinado con el Jefe de Clan o Tesorería del evento."
-          });
-        } else {
-          setConfig({
-            bankDetails: "Datos de pago no disponibles.",
-            cashDetails: "Pago en efectivo coordinado con el Jefe de Clan o Tesorería del evento."
-          });
+          const data = configDoc.data() as Config;
+          setConfig(data);
+          
+          if (data.registrationDeadline) {
+            const deadline = new Date(data.registrationDeadline);
+            if (new Date() > deadline) {
+              setDeadlinePassed(true);
+            }
+          }
         }
       } catch (e) {
         console.error("Error fetching config", e);
@@ -63,6 +65,33 @@ export default function RegistrationForm({ onBack }: Props) {
     };
     fetchConfig();
   }, []);
+
+  const checkUserExists = async (id: string) => {
+    if (!id || id.length < 5) return;
+    setCheckingUser(true);
+    try {
+      const q = query(collection(db, "registrations"), where("idNumber", "==", id));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const userData = snap.docs[0].data();
+        setFormData(prev => ({
+          ...prev,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          email: userData.email,
+          membershipType: userData.membershipType,
+          scoutGroup: userData.scoutGroup,
+        }));
+        setUserExists(true);
+      } else {
+        setUserExists(false);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCheckingUser(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -83,46 +112,143 @@ export default function RegistrationForm({ onBack }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.scoutGroup) {
-      setError("Por favor seleccione un Grupo Scout.");
+
+    if (deadlinePassed && !userExists) {
+      setError("El periodo de inscripciones ha finalizado.");
       return;
     }
+
     setLoading(true);
     setError(null);
 
     try {
-      const data = {
-        ...formData,
-        amount: parseFloat(formData.amount),
-        exchangeRate: formData.exchangeRate ? parseFloat(formData.exchangeRate) : undefined,
-        adminStatus: Status.PENDING,
-        opsStatus: Status.PENDING,
+      const amountValue = parseFloat(formData.amount);
+      if (isNaN(amountValue) || amountValue <= 0) {
+        setError("Por favor ingrese un monto válido.");
+        setLoading(false);
+        return;
+      }
+
+      let amountUSD = 0;
+
+      if (formData.paymentMethod === PaymentMethod.CASH) {
+        amountUSD = amountValue;
+      } else {
+        const rate = parseFloat(formData.exchangeRate);
+        if (isNaN(rate) || rate <= 0) {
+          setError("Por favor ingrese una tasa de cambio válida para reportar transferencias.");
+          setLoading(false);
+          return;
+        }
+        amountUSD = amountValue / rate;
+      }
+      
+      if (!formData.bankReference && formData.paymentMethod === PaymentMethod.TRANSFER) {
+        setError("La referencia bancaria es obligatoria para transferencias.");
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.receiptNumber && formData.paymentMethod === PaymentMethod.CASH) {
+        setError("El número de recibo es obligatorio para pagos en efectivo.");
+        setLoading(false);
+        return;
+      }
+
+      // 1. Ensure Participant exists
+      const userRef = query(collection(db, "registrations"), where("idNumber", "==", formData.idNumber));
+      const userSnap = await getDocs(userRef);
+      
+      if (userSnap.empty && !userExists) {
+        // Double check scoutGroup before creating
+        if (!formData.scoutGroup) {
+          setError("Por favor seleccione un Grupo Scout.");
+          setLoading(false);
+          return;
+        }
+
+        await addDoc(collection(db, "registrations"), {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          idNumber: formData.idNumber,
+          email: formData.email,
+          membershipType: formData.membershipType,
+          scoutGroup: formData.scoutGroup,
+          opsStatus: Status.PENDING,
+          checkedIn: false,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      // 2. Add Payment record
+      const paymentData = {
+        idNumber: formData.idNumber,
+        paymentMethod: formData.paymentMethod,
+        bankReference: formData.bankReference || "",
+        receiptNumber: formData.receiptNumber || "",
+        exchangeRate: formData.exchangeRate ? parseFloat(formData.exchangeRate) : 0,
+        amount: amountValue,
+        amountUSD: amountUSD,
+        paymentDate: formData.paymentDate,
         proofUrl: proofData || "",
         proofName: proofName || "",
-        checkedIn: false,
+        status: Status.PENDING,
         createdAt: new Date().toISOString(),
       };
 
-      await addDoc(collection(db, "registrations"), data);
+      await addDoc(collection(db, "payments"), paymentData);
       setSubmitted(true);
     } catch (e) {
-      handleFirestoreError(e, OperationType.CREATE, "registrations");
-      setError("Hubo un error al procesar su solicitud. Intente de nuevo.");
+      console.error("Submission error:", e);
+      handleFirestoreError(e, OperationType.CREATE, "payments");
+      setError("Hubo un error al procesar su solicitud. Por favor intente de nuevo.");
     } finally {
       setLoading(false);
     }
   };
 
+  if (deadlinePassed && !userExists) {
+    return (
+      <div className="bg-white p-8 rounded-3xl shadow-xl text-center space-y-6">
+        <AlertCircle className="w-20 h-20 text-amber-500 mx-auto" />
+        <h2 className="text-3xl font-bold text-gray-900 uppercase italic">Inscripciones Cerradas</h2>
+        <p className="text-gray-600">
+          Lo sentimos, la fecha límite para nuevas inscripciones ha pasado ({config?.registrationDeadline && new Date(config.registrationDeadline).toLocaleDateString()}).
+        </p>
+        <p className="font-medium text-primary">
+          Si ya estás inscrito y necesitas reportar una cuota adicional, por favor ingresa tu cédula a continuación para continuar.
+        </p>
+        <div className="space-y-4 max-w-xs mx-auto">
+          <input
+            type="text"
+            placeholder="Introduce tu Cédula"
+            onChange={(e) => {
+              if (e.target.value.length >= 6) checkUserExists(e.target.value);
+            }}
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-center font-bold"
+          />
+          <button 
+            onClick={onBack}
+            className="w-full bg-gray-100 text-gray-600 py-3 rounded-xl font-bold uppercase"
+          >
+            Volver
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (submitted) {
     return (
       <div className="bg-white p-8 rounded-3xl shadow-xl text-center space-y-6">
         <CheckCircle2 className="w-20 h-20 text-green-500 mx-auto" />
-        <h2 className="text-3xl font-bold text-gray-900 uppercase italic">¡Datos Recibidos!</h2>
+        <h2 className="text-3xl font-bold text-gray-900 uppercase italic">¡Pago Reportado!</h2>
         <p className="text-gray-600">
-          Su información ha sido registrada correctamente. Nuestro equipo administrativo verificará su pago y validación institucional.
+          Su reporte de pago ha sido recibido y será procesado por nuestro equipo administrativo.
+          {userExists ? " Se ha añadido un nuevo abono a su perfil." : " Su perfil ha sido creado exitosamente con este primer pago."}
         </p>
         <p className="font-medium text-primary">
-          Puede consultar el status de su inscripción en la sección "Consultar" usando su número de cédula.
+          Puede consultar su saldo acumulado en la sección "Consultar status" usando su cédula.
         </p>
         <button 
           onClick={onBack}
@@ -140,95 +266,124 @@ export default function RegistrationForm({ onBack }: Props) {
         <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
           <ChevronLeft className="w-6 h-6 text-gray-400" />
         </button>
-        <h2 className="text-3xl font-bold text-gray-900 uppercase italic tracking-tight">Registro de Participante</h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 uppercase italic tracking-tight">
+          {userExists ? "Reportar Nueva Cuota" : "Registro y Primer Pago"}
+        </h2>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-1.5">
-            <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Nombres</label>
-            <input
-              required
-              type="text"
-              value={formData.firstName}
-              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-              placeholder="Ej. Juan Andrés"
-            />
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Profile Section */}
+        <div className="space-y-6">
+          <div className="flex items-center space-x-2 text-primary border-b border-primary/10 pb-2">
+            <UserPlus className="w-5 h-5" />
+            <h3 className="font-bold uppercase text-sm tracking-widest">Datos Personales</h3>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Apellidos</label>
-            <input
-              required
-              type="text"
-              value={formData.lastName}
-              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-              placeholder="Ej. Pérez García"
-            />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Cédula</label>
+              <div className="relative">
+                <input
+                  required
+                  type="text"
+                  value={formData.idNumber}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData({ ...formData, idNumber: val });
+                    if (val.length >= 6) checkUserExists(val);
+                  }}
+                  className={`w-full px-4 py-3 rounded-xl border ${userExists ? 'border-green-500 bg-green-50' : 'border-gray-200'} focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all`}
+                  placeholder="Ej. 12345678"
+                />
+                {checkingUser && (
+                  <div className="absolute right-3 top-3 px-2 py-1 bg-white rounded-md shadow-sm flex items-center">
+                    <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                  </div>
+                )}
+              </div>
+              {userExists && <p className="text-[10px] text-green-600 font-bold uppercase mt-1 px-1">Usuario encontrado - Reportando nueva cuota</p>}
+            </div>
+            
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Correo Electrónico</label>
+              <input
+                required
+                disabled={userExists}
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all disabled:bg-gray-50"
+                placeholder="correo@ejemplo.com"
+              />
+            </div>
           </div>
+
+          {!userExists && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Nombres</label>
+                  <input
+                    required
+                    type="text"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                    placeholder="Ej. Juan Andrés"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Apellidos</label>
+                  <input
+                    required
+                    type="text"
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                    placeholder="Ej. Pérez García"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Tipo de Membresía</label>
+                  <select
+                    value={formData.membershipType}
+                    onChange={(e) => setFormData({ ...formData, membershipType: e.target.value as MembershipType })}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all appearance-none bg-white font-medium"
+                  >
+                    <option value={MembershipType.JOVEN}>Joven</option>
+                    <option value={MembershipType.ADULTO}>Adulto</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Grupo Scout</label>
+                  <select
+                    required
+                    value={formData.scoutGroup}
+                    onChange={(e) => setFormData({ ...formData, scoutGroup: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all appearance-none bg-white font-medium"
+                  >
+                    <option value="" disabled>Seleccionar Grupo</option>
+                    {SCOUT_GROUPS.map((group) => (
+                      <option key={group} value={group}>
+                        {group}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-1.5">
-            <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Cédula</label>
-            <input
-              required
-              type="text"
-              value={formData.idNumber}
-              onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-              placeholder="Ej. 12345678"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Correo Electrónico</label>
-            <input
-              required
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-              placeholder="correo@ejemplo.com"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-1.5">
-            <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Tipo de Membresía</label>
-            <select
-              value={formData.membershipType}
-              onChange={(e) => setFormData({ ...formData, membershipType: e.target.value as MembershipType })}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all appearance-none bg-white font-medium"
-            >
-              <option value={MembershipType.JOVEN}>Joven</option>
-              <option value={MembershipType.ADULTO}>Adulto</option>
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Grupo Scout</label>
-            <select
-              required
-              value={formData.scoutGroup}
-              onChange={(e) => setFormData({ ...formData, scoutGroup: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all appearance-none bg-white font-medium"
-            >
-              <option value="" disabled>Seleccionar Grupo</option>
-              {SCOUT_GROUPS.map((group) => (
-                <option key={group} value={group}>
-                  {group}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
+        {/* Payment Section */}
         <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 text-primary">
               <CreditCard className="w-5 h-5" />
-              <h3 className="font-bold uppercase text-sm tracking-widest">Información de Pago</h3>
+              <h3 className="font-bold uppercase text-sm tracking-widest">Información de Cuota</h3>
             </div>
             <div className="flex bg-gray-100 p-1 rounded-lg">
               <button
@@ -249,7 +404,7 @@ export default function RegistrationForm({ onBack }: Props) {
           </div>
           
           <div className="bg-white p-4 rounded-xl border border-primary/20 text-sm font-mono whitespace-pre-wrap">
-            {formData.paymentMethod === PaymentMethod.TRANSFER ? config.bankDetails : config.cashDetails}
+            {formData.paymentMethod === PaymentMethod.TRANSFER ? config?.bankDetails : config?.cashDetails || "Cargando..."}
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
@@ -319,7 +474,7 @@ export default function RegistrationForm({ onBack }: Props) {
             </div>
           </div>
 
-        <div className="space-y-2">
+          <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Adjuntar Comprobante (Máximo 800KB)</label>
             <input 
               type="file"
@@ -333,14 +488,14 @@ export default function RegistrationForm({ onBack }: Props) {
         {error && <p className="text-red-500 text-sm font-medium text-center">{error}</p>}
 
         <button
-          disabled={loading}
+          disabled={loading || checkingUser}
           type="submit"
           className="w-full bg-primary text-white py-4 rounded-2xl font-bold uppercase hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 flex items-center justify-center space-x-2 disabled:opacity-70"
         >
           {loading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
           ) : (
-            <span>Enviar Registro</span>
+            <span>{userExists ? "Reportar Cuota" : "Enviar Registro Completo"}</span>
           )}
         </button>
       </form>
