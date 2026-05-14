@@ -103,7 +103,7 @@ export default function StatusCheck({ onBack }: Props) {
         <h2 className="text-3xl font-bold text-gray-900 uppercase italic tracking-tight">Consultar Status</h2>
       </div>
 
-      <form onSubmit={handleSearch} className="flex gap-4">
+      <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
@@ -117,7 +117,7 @@ export default function StatusCheck({ onBack }: Props) {
         <button
           type="submit"
           disabled={loading}
-          className="bg-primary text-white px-8 rounded-2xl font-bold uppercase hover:bg-primary-dark transition-all disabled:opacity-70 flex items-center justify-center min-w-[120px]"
+          className="w-full sm:w-auto bg-primary text-white px-8 py-4 sm:py-0 rounded-2xl font-bold uppercase hover:bg-primary-dark transition-all disabled:opacity-70 flex items-center justify-center min-w-[120px]"
         >
           {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Buscar"}
         </button>

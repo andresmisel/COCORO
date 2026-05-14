@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { ChevronLeft, Lock, Loader2, ArrowRight } from "lucide-react";
-import { StaffRole } from "../types";
+import { StaffRole, StaffMember } from "../types";
 import StaffDashboard from "./StaffDashboard";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "../lib/firebase";
 
 interface Props {
   onBack: () => void;
@@ -10,30 +12,53 @@ interface Props {
 export default function StaffLogin({ onBack }: Props) {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<StaffRole>(null);
+  const [staffName, setStaffName] = useState<string>("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    setTimeout(() => {
-      if (password === "admin321") {
-        setRole("admin");
-      } else if (password === "soporte321") {
-        setRole("ops");
-      } else if (password === "superadmin321") {
+    try {
+      // First check hardcoded superadmin for emergency/first time
+      if (password === "superadmin321") {
         setRole("superadmin");
-      } else {
-        setError("Clave de acceso incorrecta");
+        setStaffName("Super Admin (Sistema)");
+        setLoading(false);
+        return;
       }
+
+      const q = query(collection(db, "staff"), where("password", "==", password));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const staffData = querySnapshot.docs[0].data() as StaffMember;
+        setRole(staffData.role);
+        setStaffName(staffData.name);
+      } else {
+        // Fallback for current hardcoded ones if not in DB yet
+        if (password === "admin321") {
+          setRole("admin");
+          setStaffName("Sistema (Leindenz)");
+        } else if (password === "soporte321") {
+          setRole("ops");
+          setStaffName("Sistema (Andres)");
+        } else {
+          setError("Clave de acceso incorrecta");
+        }
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("Error al conectar con el servidor");
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
   if (role) {
-    return <StaffDashboard role={role} onLogout={() => setRole(null)} />;
+    return <StaffDashboard role={role} staffName={staffName} onLogout={() => setRole(null)} />;
   }
 
   return (

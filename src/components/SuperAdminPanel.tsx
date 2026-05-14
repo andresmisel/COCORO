@@ -10,9 +10,10 @@ interface Props {
   registrations: Registration[];
   payments: Payment[];
   onExport: () => void;
+  staffName: string;
 }
 
-export default function SuperAdminPanel({ registrations, payments, onExport }: Props) {
+export default function SuperAdminPanel({ registrations, payments, onExport, staffName }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editType, setEditType] = useState<"registration" | "payment" | null>(null);
   const [editValues, setEditValues] = useState<any>({});
@@ -119,7 +120,10 @@ export default function SuperAdminPanel({ registrations, payments, onExport }: P
     
     try {
       if (editType === "registration") {
-        await updateDoc(doc(db, "registrations", editingId), editValues);
+        await updateDoc(doc(db, "registrations", editingId), {
+          ...editValues,
+          validatedBy: `${staffName} (Edit)`
+        });
       } else {
         // Recalculate USD if rate or amount changed
         const payment = payments.find(p => p.id === editingId);
@@ -130,7 +134,8 @@ export default function SuperAdminPanel({ registrations, payments, onExport }: P
           }
           await updateDoc(doc(db, "payments", editingId), {
             ...editValues,
-            amountUSD
+            amountUSD,
+            approvedBy: `${staffName} (Edit)`
           });
         }
       }
@@ -145,18 +150,18 @@ export default function SuperAdminPanel({ registrations, payments, onExport }: P
     <div className="space-y-6">
       {/* Config Sections */}
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-2 text-primary">
             <Settings className="w-5 h-5" />
-            <h3 className="font-bold uppercase text-xs tracking-widest">Configuración Maestra</h3>
+            <h3 className="font-bold uppercase text-xs tracking-widest">Maestro</h3>
           </div>
           <button 
             onClick={() => isEditingConfig ? saveConfig() : setIsEditingConfig(true)}
             disabled={configLoading}
-            className="flex items-center space-x-2 bg-primary/10 text-primary px-4 py-2 rounded-xl font-bold uppercase text-[10px] hover:bg-primary/20 transition-all"
+            className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-primary/10 text-primary px-4 py-2 rounded-xl font-bold uppercase text-[10px] hover:bg-primary/20 transition-all"
           >
             {configLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : isEditingConfig ? <Save className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />}
-            <span>{isEditingConfig ? "Guardar Cambios" : "Editar Configuración"}</span>
+            <span>{isEditingConfig ? "Guardar" : "Editar"}</span>
           </button>
         </div>
 
@@ -210,32 +215,32 @@ export default function SuperAdminPanel({ registrations, payments, onExport }: P
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-        <div className="flex bg-gray-50 p-1 rounded-xl">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+        <div className="flex bg-gray-50 p-1 rounded-xl w-full lg:w-auto">
           <button 
             onClick={() => setView("users")}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${view === 'users' ? 'bg-white text-primary shadow-sm' : 'text-gray-500'}`}
+            className={`flex-1 lg:flex-none flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${view === 'users' ? 'bg-white text-primary shadow-sm' : 'text-gray-500'}`}
           >
             <User className="w-3 h-3" />
             <span>Usuarios</span>
           </button>
           <button 
             onClick={() => setView("payments")}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${view === 'payments' ? 'bg-white text-primary shadow-sm' : 'text-gray-500'}`}
+            className={`flex-1 lg:flex-none flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${view === 'payments' ? 'bg-white text-primary shadow-sm' : 'text-gray-500'}`}
           >
             <CreditCard className="w-3 h-3" />
             <span>Pagos</span>
           </button>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 text-red-500 italic">
-            <AlertTriangle className="w-4 h-4" />
-            <span className="font-bold uppercase text-[10px] tracking-widest">Peligro: Borrado sin confirmación omitido por seguridad</span>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
+          <div className="flex items-center space-x-2 text-red-500 italic bg-red-50 px-3 py-1.5 rounded-lg border border-red-100">
+            <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+            <span className="font-bold uppercase text-[8px] md:text-[10px] tracking-widest leading-tight">Borrado omitido por seguridad</span>
           </div>
           <button 
             onClick={onExport}
-            className="flex items-center space-x-2 bg-gray-900 text-white px-4 py-2 rounded-xl font-bold uppercase text-[10px] hover:bg-black transition-all shadow-lg"
+            className="flex items-center justify-center space-x-2 bg-gray-900 text-white px-4 py-2 rounded-xl font-bold uppercase text-[10px] hover:bg-black transition-all shadow-lg"
           >
             <Download className="w-4 h-4" />
             <span>Exportar Data</span>
@@ -278,8 +283,17 @@ export default function SuperAdminPanel({ registrations, payments, onExport }: P
                         </div>
                       ) : (
                         <>
-                          <p className="font-bold text-gray-900 uppercase text-sm">{reg.firstName} {reg.lastName}</p>
-                          <p className="text-xs text-gray-500 font-mono">V-{reg.idNumber}</p>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-bold text-gray-900 uppercase text-sm">{reg.firstName} {reg.lastName}</p>
+                              <p className="text-xs text-gray-500 font-mono">V-{reg.idNumber}</p>
+                            </div>
+                            {reg.validatedBy && (
+                              <span className="text-[8px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded font-black uppercase tracking-tighter self-start mt-0.5">
+                                Val: {reg.validatedBy}
+                              </span>
+                            )}
+                          </div>
                         </>
                       )}
                     </td>
@@ -331,7 +345,14 @@ export default function SuperAdminPanel({ registrations, payments, onExport }: P
               <tbody className="divide-y divide-gray-50">
                 {payments.map((p) => (
                   <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 text-xs font-mono font-bold">{p.idNumber}</td>
+                    <td className="px-6 py-4 text-xs font-mono font-bold">
+                      {p.idNumber}
+                      {p.approvedBy && (
+                        <div className="text-[8px] text-gray-400 font-bold uppercase mt-1 tracking-tighter">
+                           Admin: {p.approvedBy}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       {editingId === p.id && editType === "payment" ? (
                         <input 

@@ -12,9 +12,11 @@ interface Props {
   config: Config | null;
   onExportAll: () => void;
   onExportAttendees: () => void;
+  staffName: string;
+  role: string;
 }
 
-export default function OpsPanel({ registrations, payments, config, onExportAll, onExportAttendees }: Props) {
+export default function OpsPanel({ registrations, payments, config, onExportAll, onExportAttendees, staffName, role }: Props) {
   const [showScanner, setShowScanner] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [obsId, setObsId] = useState<string | null>(null);
@@ -22,7 +24,10 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
 
   const updateStatus = async (id: string, status: Status) => {
     try {
-      await updateDoc(doc(db, "registrations", id), { opsStatus: status });
+      await updateDoc(doc(db, "registrations", id), { 
+        opsStatus: status,
+        validatedBy: staffName
+      });
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, `registrations/${id}`);
     }
@@ -42,7 +47,8 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
     try {
       await updateDoc(doc(db, "registrations", id), { 
         checkedIn: true, 
-        checkInTime: new Date().toISOString() 
+        checkInTime: new Date().toISOString(),
+        checkedInBy: staffName
       });
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, `registrations/${id}`);
@@ -104,7 +110,8 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
                   if (isCompletado && regData.opsStatus === Status.APPROVED) {
                     await updateDoc(doc(db, "registrations", regDoc.id), { 
                       checkedIn: true, 
-                      checkInTime: new Date().toISOString() 
+                      checkInTime: new Date().toISOString(),
+                      checkedInBy: staffName
                     });
                     alert(`✅ ¡Acceso CONCEDIDO para ${regData.firstName} ${regData.lastName}!`);
                   } else if (!isCompletado) {
@@ -161,6 +168,9 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
                       }`}>
                         {reg.opsStatus === Status.APPROVED ? 'Vigente' : reg.opsStatus === Status.REJECTED ? 'Vencido' : 'Pendiente'}
                       </span>
+                      {role === "superadmin" && reg.validatedBy && (
+                        <p className="text-[8px] text-gray-400 mt-0.5 uppercase font-bold tracking-tighter">Por: {reg.validatedBy}</p>
+                      )}
                       {/* Solvency Indicator */}
                       {(() => {
                         const userPayments = payments.filter(p => p.idNumber === reg.idNumber && p.status === Status.APPROVED);
@@ -186,6 +196,9 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
                           <CheckCircle className="w-3 h-3" /> PRESENTE
                         </span>
                         <span className="text-[9px] text-gray-400 font-mono">{reg.checkInTime ? new Date(reg.checkInTime).toLocaleTimeString() : ''}</span>
+                        {role === "superadmin" && reg.checkedInBy && (
+                          <p className="text-[7px] text-gray-400 font-bold uppercase tracking-tighter">Por: {reg.checkedInBy}</p>
+                        )}
                       </div>
                     ) : (
                       <button 

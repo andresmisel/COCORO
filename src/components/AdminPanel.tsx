@@ -11,16 +11,21 @@ interface Props {
   payments: Payment[];
   onExport: () => void;
   searchTerm?: string;
+  staffName: string;
+  role: string;
 }
 
-export default function AdminPanel({ registrations, payments, onExport, searchTerm }: Props) {
+export default function AdminPanel({ registrations, payments, onExport, searchTerm, staffName, role }: Props) {
   const [obsId, setObsId] = useState<string | null>(null);
   const [obsText, setObsText] = useState("");
   const [viewProof, setViewProof] = useState<Payment | null>(null);
 
   const updatePaymentStatus = async (id: string, status: Status) => {
     try {
-      await updateDoc(doc(db, "payments", id), { status });
+      await updateDoc(doc(db, "payments", id), { 
+        status,
+        approvedBy: staffName 
+      });
       if (viewProof && viewProof.id === id) setViewProof(null);
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, `payments/${id}`);
@@ -43,14 +48,14 @@ export default function AdminPanel({ registrations, payments, onExport, searchTe
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-        <h3 className="font-bold uppercase italic text-gray-500 text-xs tracking-widest pl-2">Control de Reportes (Reporte por Reporte)</h3>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+        <h3 className="font-bold uppercase italic text-gray-500 text-[10px] md:text-xs tracking-widest pl-2">Control de Reportes (Individual)</h3>
         <button 
           onClick={onExport}
-          className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded-xl font-bold uppercase text-xs hover:bg-primary-dark transition-all shadow-lg shadow-primary/20"
+          className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-primary text-white px-4 py-2 rounded-xl font-bold uppercase text-xs hover:bg-primary-dark transition-all shadow-lg shadow-primary/20"
         >
           <Download className="w-4 h-4" />
-          <span>Exportar Historial Excel</span>
+          <span>Exportar Historial</span>
         </button>
       </div>
 
@@ -127,6 +132,9 @@ export default function AdminPanel({ registrations, payments, onExport, searchTe
                       }`}>
                         {p.status === Status.APPROVED ? 'Aprobado' : p.status === Status.REJECTED ? 'Rechazado' : 'Pendiente'}
                       </span>
+                      {role === "superadmin" && p.approvedBy && (
+                        <p className="text-[8px] text-gray-400 mt-1 uppercase font-bold tracking-tighter">Por: {p.approvedBy}</p>
+                      )}
                       {p.adminObservations && (
                         <p className="text-[9px] text-gray-400 mt-1 italic max-w-[100px] mx-auto truncate">"{p.adminObservations}"</p>
                       )}

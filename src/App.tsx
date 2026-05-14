@@ -13,7 +13,9 @@ import {
   X, 
   MapPin,
   Users,
-  CalendarCheck
+  CalendarCheck,
+  Image,
+  ExternalLink
 } from "lucide-react";
 import RegistrationForm from "./components/RegistrationForm";
 import StatusCheck from "./components/StatusCheck";
@@ -124,44 +126,50 @@ export default function App() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="max-w-7xl mx-auto px-4 py-12 text-center"
+              className="max-w-7xl mx-auto px-4 py-8 md:py-12 text-center"
             >
-              <div className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary font-bold text-xs uppercase tracking-widest mb-6">
-                Distrito Ávila 2026
+              <div className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary font-bold text-[10px] md:text-xs uppercase tracking-widest mb-6">
+                {config?.headerTagline || "Caracas 2026"}
               </div>
-              <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-gray-900 mb-6 uppercase italic">
-                Congreso de <br/><span className="text-primary">Comunidad Rover</span>
+              <h1 className="text-4xl md:text-7xl font-bold tracking-tighter text-gray-900 mb-6 uppercase italic leading-tight">
+                {config?.eventName || "Congreso de Comunidad Rover"}
               </h1>
-              <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-10">
-                Bienvenido a COCORO, la plataforma oficial para el registro, validación y control de asistencia al evento de la unidad de clan más esperado del año.
+              <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-10 px-4">
+                {config?.eventDescription || "Bienvenido a COCORO, la plataforma oficial para el registro, validación y control de asistencia al evento de la unidad de clan más esperado del año."}
               </p>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto px-2">
                 <button 
                   onClick={() => navigate("register")}
-                  className="group relative overflow-hidden bg-primary text-white p-8 rounded-3xl flex flex-col items-center justify-center space-y-4 hover:shadow-xl transition-all hover:-translate-y-1"
+                  className="group relative overflow-hidden bg-primary text-white p-6 md:p-8 rounded-3xl flex flex-col items-center justify-center space-y-4 hover:shadow-xl transition-all hover:-translate-y-1"
                   id="home-btn-register"
                 >
-                  <ClipboardCheck className="w-12 h-12" />
-                  <span className="text-2xl font-bold uppercase">Formulario de Registro y Reporte de Cuotas</span>
+                  <ClipboardCheck className="w-10 h-10 md:w-12 md:h-12" />
+                  <span className="text-xl md:text-2xl font-bold uppercase">Formulario de Registro y Reporte de Cuotas</span>
                   <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
                 
                 <button 
                   onClick={() => navigate("status")}
-                  className="group relative overflow-hidden border-2 border-primary text-primary p-8 rounded-3xl flex flex-col items-center justify-center space-y-4 hover:bg-primary/5 hover:shadow-lg transition-all hover:-translate-y-1"
+                  className="group relative overflow-hidden border-2 border-primary text-primary p-6 md:p-8 rounded-3xl flex flex-col items-center justify-center space-y-4 hover:bg-primary/5 hover:shadow-lg transition-all hover:-translate-y-1"
                   id="home-btn-status"
                 >
-                  <Search className="w-12 h-12" />
-                  <span className="text-2xl font-bold uppercase">Consultar Status</span>
+                  <Search className="w-10 h-10 md:w-12 md:h-12" />
+                  <span className="text-xl md:text-2xl font-bold uppercase">Consultar Status</span>
                   <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
               </div>
 
-              <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 border-t border-gray-100 pt-12">
-                <div className="flex flex-col items-center">
+              <div className="mt-16 md:mt-20 grid grid-cols-1 sm:grid-cols-3 gap-8 border-t border-gray-100 pt-12">
+                <div 
+                  className={`flex flex-col items-center ${config?.locationUrl ? 'cursor-pointer hover:bg-gray-50 rounded-2xl p-4 transition-all' : ''}`}
+                  onClick={() => config?.locationUrl && window.open(config.locationUrl, "_blank")}
+                >
                   <MapPin className="text-primary mb-3" />
-                  <h3 className="font-bold uppercase tracking-tight">Ubicación</h3>
+                  <h3 className="font-bold uppercase tracking-tight flex items-center space-x-1">
+                    <span>Ubicación</span>
+                    {config?.locationUrl && <ExternalLink className="w-3 h-3 text-gray-400" />}
+                  </h3>
                   <p className="text-sm text-gray-500">{config?.eventLocation || "Distrito Ávila, Venezuela"}</p>
                 </div>
                 <div className="flex flex-col items-center">
@@ -172,9 +180,35 @@ export default function App() {
                 <div className="flex flex-col items-center">
                   <ShieldCheck className="text-primary mb-3" />
                   <h3 className="font-bold uppercase tracking-tight">Unidad Scout</h3>
-                  <p className="text-sm text-gray-500">Clan</p>
+                  <p className="text-sm text-gray-500">{config?.scoutUnit || "Clan"}</p>
                 </div>
               </div>
+
+              {config?.photoAlbumUrl && (
+                <div className="mt-16 bg-gradient-to-br from-primary/5 to-amber-50 p-8 md:p-12 rounded-[40px] border border-primary/10 shadow-sm overflow-hidden relative group">
+                  <div className="absolute top-0 right-0 p-8 hidden md:block opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Image className="w-32 h-32 text-primary -rotate-12" />
+                  </div>
+                  <div className="relative z-10 flex flex-col items-center text-center">
+                    <div className="bg-primary/10 p-4 rounded-3xl text-primary mb-6">
+                      <Image className="w-10 h-10" />
+                    </div>
+                    <h2 className="text-3xl md:text-4xl font-black text-gray-900 uppercase italic tracking-tighter mb-4">Álbum de Fotos</h2>
+                    <p className="text-gray-600 max-w-lg mx-auto mb-8 text-sm md:text-base">
+                      Accede a nuestro álbum oficial para revivir los mejores momentos, descargar tus fotos o compartir las que tomaste durante el evento.
+                    </p>
+                    <a 
+                      href={config.photoAlbumUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center space-x-3 bg-primary text-white px-8 py-4 rounded-2xl font-bold uppercase hover:bg-primary-dark transition-all shadow-xl shadow-primary/20 hover:-translate-y-1"
+                    >
+                      <ExternalLink className="w-5 h-5" />
+                      <span>Ver Álbum Oficial</span>
+                    </a>
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -219,7 +253,7 @@ export default function App() {
       <footer className="bg-gray-50 border-t border-gray-200 py-12 mt-12">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-gray-400 text-sm mb-4 uppercase tracking-widest font-bold">
-            Congreso de Comunidad Rover 2026
+            {config?.eventName || "Congreso de Comunidad Rover"} 2026
           </p>
           <div className="flex justify-center space-x-4 mb-4">
             <span className="text-gray-500 font-bold uppercase italic tracking-tighter">COCORO ♥♥♥♥♥</span>

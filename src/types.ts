@@ -28,6 +28,7 @@ export interface Payment {
   proofName?: string;
   status: Status;
   adminObservations?: string;
+  approvedBy?: string;
   createdAt: string;
 }
 
@@ -41,7 +42,9 @@ export interface Registration {
   scoutGroup: string;
   opsStatus: Status;
   opsObservations?: string;
+  validatedBy?: string;
   checkedIn: boolean;
+  checkedInBy?: string;
   checkInTime?: string;
   createdAt: string;
 }
@@ -53,6 +56,20 @@ export interface Config {
   eventLocation: string;
   totalCostUSD: number;
   registrationDeadline: string;
+  scoutUnit: string;
+  eventName: string;
+  eventDescription: string;
+  headerTagline: string;
+  locationUrl?: string;
+  photoAlbumUrl?: string;
 }
 
 export type StaffRole = "admin" | "ops" | "superadmin" | null;
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  password: string;
+  role: "admin" | "ops" | "superadmin";
+  createdAt: string;
+}

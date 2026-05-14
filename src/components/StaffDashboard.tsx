@@ -28,26 +28,34 @@ import {
   Filter,
   BarChart3,
   Users,
-  DollarSign
+  DollarSign,
+  ShieldCheck,
+  Key,
+  Plus,
+  User,
+  ExternalLink,
+  Image
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { handleFirestoreError, OperationType } from "../lib/error-handler";
 import AdminPanel from "./AdminPanel";
 import OpsPanel from "./OpsPanel";
 import SuperAdminPanel from "./SuperAdminPanel";
+import { StaffMember } from "../types";
 
 interface Props {
   role: StaffRole;
+  staffName: string;
   onLogout: () => void;
 }
 
-export default function StaffDashboard({ role, onLogout }: Props) {
+export default function StaffDashboard({ role, staffName, onLogout }: Props) {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"list" | "progress" | "stats" | "config">("list");
+  const [activeTab, setActiveTab] = useState<"list" | "progress" | "stats" | "config" | "staff_mgmt">("list");
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -148,6 +156,7 @@ export default function StaffDashboard({ role, onLogout }: Props) {
           Equivalente_USD: p.amountUSD,
           Referencia_Recibo: p.paymentMethod === PaymentMethod.TRANSFER ? p.bankReference : p.receiptNumber,
           Status_Pago: p.status,
+          Aprobado_Por: p.approvedBy || "N/A",
           Fecha_Pago: p.paymentDate,
           Fecha_Reporte: p.createdAt
         };
@@ -167,11 +176,13 @@ export default function StaffDashboard({ role, onLogout }: Props) {
           Grupo: r.scoutGroup,
           Tipo_Membresia: r.membershipType,
           Status_Membresia: getMembershipStatus(r.opsStatus),
+          Validado_Por: r.validatedBy || "N/A",
           Email: r.email,
           Solvencia_Pago: missingUSD <= 0 ? "COMPLETADO" : "PENDIENTE",
           Monto_Acumulado_USD: totalPaidUSD.toFixed(2),
           Monto_Faltante_USD: missingUSD.toFixed(2),
           Check_In: r.checkedIn ? "SI" : "NO",
+          CheckIn_Por: r.checkedInBy || "N/A",
           Fecha_CheckIn: r.checkInTime || "N/A",
           Fecha_Registro: r.createdAt
         };
@@ -218,37 +229,46 @@ export default function StaffDashboard({ role, onLogout }: Props) {
       </header>
 
       {/* Tabs / Actions Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex bg-gray-100 p-1.5 rounded-2xl">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div className="flex overflow-x-auto pb-2 md:pb-0 bg-gray-100 p-1.5 rounded-2xl no-scrollbar">
           <button 
             onClick={() => setActiveTab("list")}
-            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-xs transition-all ${activeTab === 'list' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'list' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
             <DollarSign className="w-4 h-4" />
             <span>Cobranza</span>
           </button>
           <button 
             onClick={() => setActiveTab("progress")}
-            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-xs transition-all ${activeTab === 'progress' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'progress' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
             <Users className="w-4 h-4" />
             <span>Participantes</span>
           </button>
           <button 
             onClick={() => setActiveTab("stats")}
-            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-xs transition-all ${activeTab === 'stats' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'stats' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
             <BarChart3 className="w-4 h-4" />
             <span>Métricas</span>
           </button>
           {role === 'superadmin' && (
-            <button 
-              onClick={() => setActiveTab("config")}
-              className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-xs transition-all ${activeTab === 'config' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <Database className="w-4 h-4" />
-              <span>Configuración</span>
-            </button>
+            <>
+              <button 
+                onClick={() => setActiveTab("config")}
+                className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'config' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <Database className="w-4 h-4" />
+                <span>Configuracion</span>
+              </button>
+              <button 
+                onClick={() => setActiveTab("staff_mgmt")}
+                className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'staff_mgmt' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Personal</span>
+              </button>
+            </>
           )}
         </div>
 
@@ -271,6 +291,8 @@ export default function StaffDashboard({ role, onLogout }: Props) {
               payments={filteredPayments}
               registrations={registrations}
               searchTerm={searchTerm}
+              staffName={staffName}
+              role={role}
               onExport={() => exportToExcel(filteredRegistrations, "Pagos_Comunidad_Rover", true)}
             />
           )}
@@ -280,6 +302,8 @@ export default function StaffDashboard({ role, onLogout }: Props) {
               registrations={filteredRegistrations} 
               payments={payments}
               config={config}
+              staffName={staffName}
+              role={role}
               onExportAll={() => exportToExcel(filteredRegistrations, "Inscritos_Comunidad_Rover")}
               onExportAttendees={() => exportToExcel(filteredRegistrations.filter(r => r.checkedIn), "Asistentes_Comunidad_Rover")}
             />
@@ -289,6 +313,7 @@ export default function StaffDashboard({ role, onLogout }: Props) {
             <SuperAdminPanel 
               registrations={filteredRegistrations}
               payments={payments}
+              staffName={staffName}
               onExport={() => exportToExcel(filteredRegistrations, "Base_Datos_Completa")}
             />
           )}
@@ -326,9 +351,232 @@ export default function StaffDashboard({ role, onLogout }: Props) {
       {activeTab === "config" && role === "superadmin" && (
         <ConfigEditor />
       )}
+
+      {activeTab === "staff_mgmt" && role === "superadmin" && (
+        <StaffManager />
+      )}
     </div>
   );
 }
+
+function StaffManager() {
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editingPassId, setEditingPassId] = useState<string | null>(null);
+  const [tempPass, setTempPass] = useState("");
+  const [newStaff, setNewStaff] = useState<Partial<StaffMember>>({
+    name: "",
+    password: "",
+    role: "admin"
+  });
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "staff"), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StaffMember));
+      setStaff(data);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStaff.name || !newStaff.password || !newStaff.role) return;
+    
+    setSaving(true);
+    try {
+      const staffDoc = {
+        name: newStaff.name,
+        password: newStaff.password,
+        role: newStaff.role,
+        createdAt: new Date().toISOString()
+      };
+      await addStaffMember(staffDoc as Omit<StaffMember, "id">);
+      setNewStaff({ name: "", password: "", role: "admin" });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addStaffMember = async (data: Omit<StaffMember, "id">) => {
+    const staffRef = collection(db, "staff");
+    await setDoc(doc(staffRef), data);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "staff", id));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleUpdatePassword = async (id: string, newPass: string) => {
+    if (!newPass) return;
+    try {
+      await updateDoc(doc(db, "staff", id), { password: newPass });
+      setEditingPassId(null);
+      setTempPass("");
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  if (loading) return null;
+
+  return (
+    <div className="space-y-8">
+      {/* Add Form */}
+      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+        <h3 className="text-xl font-bold uppercase italic border-b pb-4 mb-6 flex items-center space-x-2">
+          <Plus className="w-5 h-5 text-primary" />
+          <span>Crear Nuevo Miembro Staff</span>
+        </h3>
+        
+        <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Nombre</label>
+            <input 
+              required
+              type="text"
+              value={newStaff.name}
+              onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm"
+              placeholder="Ej. María Pérez"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Contraseña</label>
+            <input 
+              required
+              type="text"
+              value={newStaff.password}
+              onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-mono"
+              placeholder="Min 6 caracteres"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Rol</label>
+            <select
+              required
+              value={newStaff.role}
+              onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value as any })}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm bg-white"
+            >
+              <option value="admin">Administración</option>
+              <option value="ops">Operaciones</option>
+              <option value="superadmin">Super Admin</option>
+            </select>
+          </div>
+          <button 
+            type="submit"
+            disabled={saving}
+            className="bg-primary text-white font-bold uppercase px-6 py-2.5 rounded-xl hover:bg-primary-dark transition-all shadow-md disabled:opacity-50"
+          >
+            {saving ? "Guardando..." : "Crear Accesso"}
+          </button>
+        </form>
+      </div>
+
+      {/* Staff List */}
+      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+        <h3 className="text-xl font-bold uppercase italic border-b pb-4 mb-6">Staff Registrado (Trazabilidad)</h3>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="text-left border-b border-gray-50">
+                <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4">Miembro</th>
+                <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4">Rol</th>
+                <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4">Contraseña</th>
+                <th className="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4">Fecha Creación</th>
+                <th className="pb-4 text-right px-4"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {staff.map((member) => (
+                <tr key={member.id} className="group hover:bg-gray-50 transition-colors">
+                  <td className="py-4 px-4 font-bold text-sm text-gray-800">
+                    <div className="flex items-center space-x-2">
+                       <User className="w-4 h-4 text-gray-300" />
+                       <span>{member.name}</span>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg ${
+                      member.role === 'superadmin' ? 'bg-purple-100 text-purple-600' :
+                      member.role === 'admin' ? 'bg-blue-100 text-blue-600' :
+                      'bg-orange-100 text-orange-600'
+                    }`}>
+                      {member.role === 'admin' ? 'Administración' : member.role === 'ops' ? 'Operaciones' : 'Super Admin'}
+                    </span>
+                  </td>
+                  <td className="py-4 px-4 font-mono text-xs text-gray-500">{member.password}</td>
+                  <td className="py-4 px-4 text-[10px] text-gray-400 font-mono">
+                    {new Date(member.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="py-4 px-4 text-right space-x-2">
+                    {editingPassId === member.id ? (
+                      <div className="flex items-center space-x-2 justify-end">
+                        <input 
+                          type="text"
+                          value={tempPass}
+                          onChange={(e) => setTempPass(e.target.value)}
+                          className="px-2 py-1 border border-primary rounded-lg text-xs font-mono outline-none"
+                          placeholder="Nueva clave"
+                          autoFocus
+                        />
+                        <button 
+                          onClick={() => handleUpdatePassword(member.id, tempPass)}
+                          className="bg-primary text-white p-1.5 rounded-lg hover:bg-primary-dark transition-all"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => { setEditingPassId(null); setTempPass(""); }}
+                          className="bg-gray-100 text-gray-500 p-1.5 rounded-lg hover:bg-gray-200 transition-all"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <button 
+                          onClick={() => { setEditingPassId(member.id); setTempPass(member.password); }}
+                          className="p-2 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
+                          title="Cambiar Contraseña"
+                        >
+                          <Key className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(member.id)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {staff.length === 0 && (
+            <div className="py-12 text-center text-gray-400 uppercase font-bold text-xs tracking-widest">
+               No hay miembros de staff registrados aún.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function ProgressPanel({ registrations, payments, config }: { registrations: Registration[], payments: Payment[], config: Config | null }) {
   return (
@@ -426,7 +674,13 @@ function ConfigEditor() {
     eventDate: "", 
     eventLocation: "",
     totalCostUSD: 0,
-    registrationDeadline: ""
+    registrationDeadline: "",
+    scoutUnit: "",
+    eventName: "",
+    eventDescription: "",
+    headerTagline: "",
+    locationUrl: "",
+    photoAlbumUrl: ""
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -468,6 +722,49 @@ function ConfigEditor() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Nombre del Evento</label>
+          <input 
+            type="text"
+            value={config.eventName}
+            onChange={(e) => setConfig({ ...config, eventName: e.target.value })}
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-bold"
+            placeholder="Ej: Congreso de Comunidad Rover"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Tagline Cabecera (Ej: Caracas 2026)</label>
+          <input 
+            type="text"
+            value={config.headerTagline}
+            onChange={(e) => setConfig({ ...config, headerTagline: e.target.value })}
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
+            placeholder="Ej: Caracas 2026"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Descripción del Evento</label>
+        <textarea 
+          value={config.eventDescription}
+          onChange={(e) => setConfig({ ...config, eventDescription: e.target.value })}
+          className="w-full h-24 p-4 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm leading-relaxed"
+          placeholder="Descripción que aparecerá en el home..."
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Unidad Scout</label>
+          <input 
+            type="text"
+            value={config.scoutUnit}
+            onChange={(e) => setConfig({ ...config, scoutUnit: e.target.value })}
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
+            placeholder="Ej: Clan"
+          />
+        </div>
+        <div className="space-y-1.5">
           <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Fecha del Evento</label>
           <input 
             type="text"
@@ -477,14 +774,49 @@ function ConfigEditor() {
             placeholder="Ej: 15-18 de Octubre, 2026"
           />
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Ubicación</label>
+          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Ubicación (Texto)</label>
           <input 
             type="text"
             value={config.eventLocation}
             onChange={(e) => setConfig({ ...config, eventLocation: e.target.value })}
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
             placeholder="Ej: Hacienda El Limón, Ávila"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Link Ubicación (Google Maps)</label>
+          <input 
+            type="text"
+            value={config.locationUrl || ""}
+            onChange={(e) => setConfig({ ...config, locationUrl: e.target.value })}
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
+            placeholder="Ej: https://maps.app.goo.gl/..."
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Link Álbum de Fotos (Drive/Flickr)</label>
+          <input 
+            type="text"
+            value={config.photoAlbumUrl || ""}
+            onChange={(e) => setConfig({ ...config, photoAlbumUrl: e.target.value })}
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
+            placeholder="Ej: https://drive.google.com/..."
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Fecha Límite Registro</label>
+          <input 
+            type="date"
+            value={config.registrationDeadline}
+            onChange={(e) => setConfig({ ...config, registrationDeadline: e.target.value })}
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
           />
         </div>
       </div>
@@ -498,15 +830,6 @@ function ConfigEditor() {
             onChange={(e) => setConfig({ ...config, totalCostUSD: parseFloat(e.target.value) })}
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
             placeholder="Ej: 35.00"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Fecha Límite Registro</label>
-          <input 
-            type="date"
-            value={config.registrationDeadline}
-            onChange={(e) => setConfig({ ...config, registrationDeadline: e.target.value })}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
           />
         </div>
       </div>

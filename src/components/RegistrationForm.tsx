@@ -380,23 +380,23 @@ export default function RegistrationForm({ onBack }: Props) {
 
         {/* Payment Section */}
         <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center space-x-2 text-primary">
               <CreditCard className="w-5 h-5" />
               <h3 className="font-bold uppercase text-sm tracking-widest">Información de Cuota</h3>
             </div>
-            <div className="flex bg-gray-100 p-1 rounded-lg">
+            <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, paymentMethod: PaymentMethod.TRANSFER })}
-                className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${formData.paymentMethod === PaymentMethod.TRANSFER ? 'bg-primary text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${formData.paymentMethod === PaymentMethod.TRANSFER ? 'bg-primary text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 Transferencia
               </button>
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, paymentMethod: PaymentMethod.CASH })}
-                className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${formData.paymentMethod === PaymentMethod.CASH ? 'bg-primary text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${formData.paymentMethod === PaymentMethod.CASH ? 'bg-primary text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 Efectivo
               </button>
@@ -495,7 +495,7 @@ export default function RegistrationForm({ onBack }: Props) {
           {loading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
           ) : (
-            <span>{userExists ? "Reportar Cuota" : "Enviar Registro Completo"}</span>
+            <span>{userExists ? "Reportar Cuota" : "Enviar Registro"}</span>
           )}
         </button>
       </form>
