@@ -41,10 +41,10 @@ export default function StaffLogin({ onBack }: Props) {
         // Fallback for current hardcoded ones if not in DB yet
         if (password === "admin321") {
           setRole("admin");
-          setStaffName("Sistema (Leindenz)");
+          setStaffName("Sistema Admin");
         } else if (password === "soporte321") {
           setRole("ops");
-          setStaffName("Sistema (Andres)");
+          setStaffName("Sistema Ops");
         } else {
           setError("Clave de acceso incorrecta");
         }

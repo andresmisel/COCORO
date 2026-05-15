@@ -290,7 +290,7 @@ export default function SuperAdminPanel({ registrations, payments, onExport, sta
                             </div>
                             {reg.validatedBy && (
                               <span className="text-[8px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded font-black uppercase tracking-tighter self-start mt-0.5">
-                                Val: {reg.validatedBy}
+                                Val: {reg.validatedBy.replace("Sistema (Leindenz)", "Sistema Admin").replace("Sistema (Andres)", "Sistema Ops")}
                               </span>
                             )}
                           </div>
@@ -349,7 +349,7 @@ export default function SuperAdminPanel({ registrations, payments, onExport, sta
                       {p.idNumber}
                       {p.approvedBy && (
                         <div className="text-[8px] text-gray-400 font-bold uppercase mt-1 tracking-tighter">
-                           Admin: {p.approvedBy}
+                           Admin: {p.approvedBy.replace("Sistema (Leindenz)", "Sistema Admin").replace("Sistema (Andres)", "Sistema Ops")}
                         </div>
                       )}
                     </td>

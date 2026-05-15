@@ -133,7 +133,9 @@ export default function AdminPanel({ registrations, payments, onExport, searchTe
                         {p.status === Status.APPROVED ? 'Aprobado' : p.status === Status.REJECTED ? 'Rechazado' : 'Pendiente'}
                       </span>
                       {role === "superadmin" && p.approvedBy && (
-                        <p className="text-[8px] text-gray-400 mt-1 uppercase font-bold tracking-tighter">Por: {p.approvedBy}</p>
+                        <p className="text-[8px] text-gray-400 mt-1 uppercase font-bold tracking-tighter">
+                          Por: {p.approvedBy.replace("Sistema (Leindenz)", "Sistema Admin").replace("Sistema (Andres)", "Sistema Ops")}
+                        </p>
                       )}
                       {p.adminObservations && (
                         <p className="text-[9px] text-gray-400 mt-1 italic max-w-[100px] mx-auto truncate">"{p.adminObservations}"</p>

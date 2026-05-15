@@ -15,7 +15,10 @@ import {
   Users,
   CalendarCheck,
   Image,
-  ExternalLink
+  ExternalLink,
+  Layers,
+  Clock,
+  HeartPulse
 } from "lucide-react";
 import RegistrationForm from "./components/RegistrationForm";
 import StatusCheck from "./components/StatusCheck";
@@ -160,29 +163,57 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="mt-16 md:mt-20 grid grid-cols-1 sm:grid-cols-3 gap-8 border-t border-gray-100 pt-12">
-                <div 
-                  className={`flex flex-col items-center ${config?.locationUrl ? 'cursor-pointer hover:bg-gray-50 rounded-2xl p-4 transition-all' : ''}`}
-                  onClick={() => config?.locationUrl && window.open(config.locationUrl, "_blank")}
-                >
-                  <MapPin className="text-primary mb-3" />
-                  <h3 className="font-bold uppercase tracking-tight flex items-center space-x-1">
-                    <span>Ubicación</span>
-                    {config?.locationUrl && <ExternalLink className="w-3 h-3 text-gray-400" />}
-                  </h3>
-                  <p className="text-sm text-gray-500">{config?.eventLocation || "Distrito Ávila, Venezuela"}</p>
+              {/* Event Phases Display */}
+              {config?.phases && config.phases.length > 0 && (
+                <div className="mt-20 space-y-8">
+                  <div className="flex flex-col items-center">
+                    <div className="bg-primary/10 px-4 py-1 rounded-full text-primary text-[10px] font-black uppercase tracking-[0.2em] mb-4">Cronograma</div>
+                    <h2 className="text-4xl md:text-5xl font-black text-gray-900 uppercase italic tracking-tighter">Fases del Evento</h2>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
+                    {config.phases.map((phase) => (
+                      <div 
+                        key={phase.id} 
+                        className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group"
+                      >
+                        <div className="flex justify-between items-start mb-6">
+                          <div className="bg-primary/5 p-3 rounded-2xl text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                            <Layers className="w-6 h-6" />
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <div className="flex items-center space-x-1 text-primary">
+                              <CalendarCheck className="w-3 h-3" />
+                              <span className="text-[10px] font-black uppercase">
+                                {phase.date ? new Date(phase.date + "T00:00:00").toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : "N/A"}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-1 text-gray-400">
+                              <Clock className="w-3 h-3" />
+                              <span className="text-[10px] font-bold">{phase.time}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <h3 className="text-xl font-black text-gray-900 uppercase italic mb-2 leading-tight">{phase.name}</h3>
+                        <div className="flex items-center space-x-2 mb-4">
+                          <span className="px-2 py-0.5 bg-gray-100 rounded-md text-[9px] font-black uppercase text-gray-500 tracking-wider">Acumulado Mínimo:</span>
+                          <span className="text-sm font-black text-primary font-mono">${phase.minAmount.toFixed(2)}</span>
+                        </div>
+                        
+                        <div 
+                          className={`flex items-start space-x-3 text-sm ${phase.locationUrl ? 'text-primary hover:underline cursor-pointer' : 'text-gray-500'}`}
+                          onClick={() => phase.locationUrl && window.open(phase.locationUrl, "_blank")}
+                        >
+                          <MapPin className={`w-4 h-4 mt-0.5 shrink-0 ${phase.locationUrl ? 'text-primary' : 'text-gray-300'}`} />
+                          <span className="font-medium">{phase.location}</span>
+                          {phase.locationUrl && <ExternalLink className="w-3 h-3 mt-1 opacity-50" />}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-col items-center">
-                  <CalendarCheck className="text-primary mb-3" />
-                  <h3 className="font-bold uppercase tracking-tight">Fecha</h3>
-                  <p className="text-sm text-gray-500">{config?.eventDate || "Próximamente 2026"}</p>
-                </div>
-                <div className="flex flex-col items-center">
-                  <ShieldCheck className="text-primary mb-3" />
-                  <h3 className="font-bold uppercase tracking-tight">Unidad Scout</h3>
-                  <p className="text-sm text-gray-500">{config?.scoutUnit || "Clan"}</p>
-                </div>
-              </div>
+              )}
 
               {config?.photoAlbumUrl && (
                 <div className="mt-16 bg-gradient-to-br from-primary/5 to-amber-50 p-8 md:p-12 rounded-[40px] border border-primary/10 shadow-sm overflow-hidden relative group">

@@ -14,6 +14,33 @@ export enum PaymentMethod {
   CASH = "Efectivo",
 }
 
+export interface MedicalData {
+  bloodType: string;
+  weight?: string;
+  height?: string;
+  allergies: string;
+  intolerances?: string;
+  disability?: {
+    has: boolean;
+    description: string;
+  };
+  antecedents: string;
+  medications: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+}
+
+export interface EventPhase {
+  id: string;
+  name: string;
+  location: string;
+  locationUrl?: string;
+  date: string;
+  time: string;
+  minAmount: number;
+  color: string;
+}
+
 export interface Payment {
   id: string;
   idNumber: string;
@@ -40,12 +67,14 @@ export interface Registration {
   email: string;
   membershipType: MembershipType;
   scoutGroup: string;
+  medicalData?: MedicalData;
   opsStatus: Status;
   opsObservations?: string;
   validatedBy?: string;
   checkedIn: boolean;
   checkedInBy?: string;
   checkInTime?: string;
+  phaseAttendance?: { [phaseId: string]: { attended: boolean; time: string; by: string } };
   createdAt: string;
 }
 
@@ -62,14 +91,15 @@ export interface Config {
   headerTagline: string;
   locationUrl?: string;
   photoAlbumUrl?: string;
+  phases?: EventPhase[];
 }
 
-export type StaffRole = "admin" | "ops" | "superadmin" | null;
+export type StaffRole = "admin" | "ops" | "superadmin" | "risk" | null;
 
 export interface StaffMember {
   id: string;
   name: string;
   password: string;
-  role: "admin" | "ops" | "superadmin";
+  role: "admin" | "ops" | "superadmin" | "risk";
   createdAt: string;
 }

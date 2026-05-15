@@ -12,7 +12,7 @@ import {
   where
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { Registration, StaffRole, Status, Config, Payment, PaymentMethod } from "../types";
+import { Registration, StaffRole, Status, Config, Payment, PaymentMethod, EventPhase } from "../types";
 import { 
   LogOut, 
   Download, 
@@ -34,13 +34,17 @@ import {
   Plus,
   User,
   ExternalLink,
-  Image
+  Image,
+  HeartPulse,
+  UserCheck
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { handleFirestoreError, OperationType } from "../lib/error-handler";
+import { DARK_PALETTE } from "../constants";
 import AdminPanel from "./AdminPanel";
 import OpsPanel from "./OpsPanel";
 import SuperAdminPanel from "./SuperAdminPanel";
+import { generateMedicalPDF } from "../lib/pdf-utils";
 import { StaffMember } from "../types";
 
 interface Props {
@@ -55,7 +59,10 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"list" | "progress" | "stats" | "config" | "staff_mgmt">("list");
+  const [activeTab, setActiveTab] = useState<"list" | "progress" | "stats" | "config" | "staff_mgmt" | "medical">(
+    role === 'risk' ? "medical" : "list"
+  );
+  const [editingMedical, setEditingMedical] = useState<Registration | null>(null);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -124,7 +131,55 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
       case "admin": return "Panel de Administración";
       case "ops": return "Panel de Operaciones";
       case "superadmin": return "Super Administrador";
+      case "risk": return "Gestión de Riesgo";
       default: return "Dashboard";
+    }
+  };
+
+  const exportMedicalToExcel = () => {
+    const medicalData = registrations.map(r => ({
+      Nombre: `${r.firstName} ${r.lastName}`,
+      Cedula: r.idNumber,
+      Grupo: r.scoutGroup,
+      Tipo_Sangre: r.medicalData?.bloodType || "N/A",
+      Peso: r.medicalData?.weight || "N/A",
+      Estatura: r.medicalData?.height || "N/A",
+      Alergias: r.medicalData?.allergies || "N/A",
+      Intolerancias: r.medicalData?.intolerances || "N/A",
+      Discapacidad: r.medicalData?.disability?.has ? `SI (${r.medicalData.disability.description})` : "NO",
+      Antecedentes_Medicos: r.medicalData?.antecedents || "N/A",
+      Medicamentos: r.medicalData?.medications || "N/A",
+      Contacto_Emergencia: r.medicalData?.emergencyContactName || "N/A",
+      Telefono_Emergencia: r.medicalData?.emergencyContactPhone || "N/A",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(medicalData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Fichas_Medicas");
+    XLSX.writeFile(wb, "Reporte_Medico_Participantes.xlsx");
+  };
+
+  const handleDeleteMedical = async (registrationId: string) => {
+    try {
+      await updateDoc(doc(db, "registrations", registrationId), {
+        medicalData: null
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, `registrations/${registrationId}`);
+    }
+  };
+
+  const handleUpdateMedical = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMedical || !editingMedical.medicalData) return;
+
+    try {
+      await updateDoc(doc(db, "registrations", editingMedical.id), {
+        medicalData: editingMedical.medicalData
+      });
+      setEditingMedical(null);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, `registrations/${editingMedical.id}`);
     }
   };
 
@@ -156,7 +211,7 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
           Equivalente_USD: p.amountUSD,
           Referencia_Recibo: p.paymentMethod === PaymentMethod.TRANSFER ? p.bankReference : p.receiptNumber,
           Status_Pago: p.status,
-          Aprobado_Por: p.approvedBy || "N/A",
+          Aprobado_Por: (p.approvedBy || "N/A").replace("Sistema (Leindenz)", "Sistema Admin").replace("Sistema (Andres)", "Sistema Ops"),
           Fecha_Pago: p.paymentDate,
           Fecha_Reporte: p.createdAt
         };
@@ -176,13 +231,13 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
           Grupo: r.scoutGroup,
           Tipo_Membresia: r.membershipType,
           Status_Membresia: getMembershipStatus(r.opsStatus),
-          Validado_Por: r.validatedBy || "N/A",
+          Validado_Por: (r.validatedBy || "N/A").replace("Sistema (Leindenz)", "Sistema Admin").replace("Sistema (Andres)", "Sistema Ops"),
           Email: r.email,
           Solvencia_Pago: missingUSD <= 0 ? "COMPLETADO" : "PENDIENTE",
           Monto_Acumulado_USD: totalPaidUSD.toFixed(2),
           Monto_Faltante_USD: missingUSD.toFixed(2),
           Check_In: r.checkedIn ? "SI" : "NO",
-          CheckIn_Por: r.checkedInBy || "N/A",
+          CheckIn_Por: (r.checkedInBy || "N/A").replace("Sistema (Leindenz)", "Sistema Admin").replace("Sistema (Andres)", "Sistema Ops"),
           Fecha_CheckIn: r.checkInTime || "N/A",
           Fecha_Registro: r.createdAt
         };
@@ -231,13 +286,15 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
       {/* Tabs / Actions Bar */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="flex overflow-x-auto pb-2 md:pb-0 bg-gray-100 p-1.5 rounded-2xl no-scrollbar">
-          <button 
-            onClick={() => setActiveTab("list")}
-            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'list' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            <DollarSign className="w-4 h-4" />
-            <span>Cobranza</span>
-          </button>
+          {role !== 'risk' && (
+            <button 
+              onClick={() => setActiveTab("list")}
+              className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'list' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              <DollarSign className="w-4 h-4" />
+              <span>Cobranza</span>
+            </button>
+          )}
           <button 
             onClick={() => setActiveTab("progress")}
             className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'progress' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
@@ -252,6 +309,15 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
             <BarChart3 className="w-4 h-4" />
             <span>Métricas</span>
           </button>
+          {(role === 'superadmin' || role === 'risk') && (
+            <button 
+              onClick={() => setActiveTab("medical")}
+              className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'medical' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              <HeartPulse className="w-4 h-4" />
+              <span>Médico</span>
+            </button>
+          )}
           {role === 'superadmin' && (
             <>
               <button 
@@ -339,12 +405,279 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
         </div>
       )}
 
+      {activeTab === "medical" && (role === "superadmin" || role === "risk") && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+            <h3 className="font-bold uppercase italic text-gray-500 text-xs tracking-widest pl-2">Gestión de Riesgo y Salud</h3>
+            <button 
+              onClick={exportMedicalToExcel}
+              className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-xl font-bold uppercase text-xs hover:bg-green-700 transition-all shadow-lg"
+            >
+              <Download className="w-4 h-4" />
+              <span>Exportar Excel Médico</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredRegistrations.map(r => (
+              <div key={r.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col justify-between hover:border-amber-200 transition-colors">
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className={`${r.medicalData ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-500'} p-3 rounded-2xl relative`}>
+                      <HeartPulse className="w-6 h-6" />
+                      {!r.medicalData && (
+                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="bg-gray-100 px-3 py-1 rounded-lg text-[10px] font-black uppercase text-gray-500 mb-1">
+                        V-{r.idNumber}
+                      </span>
+                      {!r.medicalData && (
+                        <span className="text-[10px] font-black text-red-600 uppercase italic tracking-tighter">Pendiente</span>
+                      )}
+                    </div>
+                  </div>
+                  <h4 className="font-black text-gray-900 uppercase italic text-lg leading-tight mb-1">
+                    {r.firstName} {r.lastName}
+                  </h4>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-4">
+                    {r.scoutGroup}
+                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="bg-gray-50 p-2 rounded-xl">
+                      <p className="text-[8px] font-bold text-gray-400 uppercase mb-0.5">Tipo Sangre</p>
+                      <p className="font-bold text-primary">{r.medicalData?.bloodType || "---"}</p>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded-xl">
+                      <p className="text-[8px] font-bold text-gray-400 uppercase mb-0.5">Alergias</p>
+                      <p className="font-bold text-sm truncate">{r.medicalData?.allergies || "Ninguna"}</p>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded-xl col-span-2">
+                      <p className="text-[8px] font-bold text-gray-400 uppercase mb-0.5">Antecedentes</p>
+                      <p className="font-bold text-sm truncate">{r.medicalData?.antecedents || "Ninguno"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex space-x-2">
+                  <button 
+                    onClick={() => generateMedicalPDF(r, config)}
+                    className="flex-1 flex items-center justify-center space-x-2 bg-gray-900 text-white py-3 rounded-xl font-bold uppercase text-[10px] hover:bg-black transition-all"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>PDF</span>
+                  </button>
+                  {role === "superadmin" && (
+                    <>
+                      <button 
+                        onClick={() => setEditingMedical(r)}
+                        className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"
+                        title="Editar Ficha"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteMedical(r.id)}
+                        className="p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-all"
+                        title="Eliminar Ficha"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Edit Medical Modal */}
+          {editingMedical && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto outline-none animate-in fade-in zoom-in duration-300">
+                <div className="sticky top-0 bg-white/80 backdrop-blur-md px-8 py-6 border-b border-gray-100 flex justify-between items-center z-10">
+                  <div>
+                    <h3 className="text-xl font-black text-gray-900 uppercase italic">Editar Ficha Médica</h3>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{editingMedical.firstName} {editingMedical.lastName}</p>
+                  </div>
+                  <button onClick={() => setEditingMedical(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <XCircle className="w-6 h-6 text-gray-400" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleUpdateMedical} className="p-8 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Sangre</label>
+                      <select 
+                        required
+                        value={editingMedical.medicalData?.bloodType}
+                        onChange={(e) => setEditingMedical({ ...editingMedical, medicalData: { ...editingMedical.medicalData!, bloodType: e.target.value } })}
+                        className="w-full px-4 py-2 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm"
+                      >
+                        {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Peso (kg)</label>
+                      <input 
+                        type="text"
+                        value={editingMedical.medicalData?.weight}
+                        onChange={(e) => setEditingMedical({ ...editingMedical, medicalData: { ...editingMedical.medicalData!, weight: e.target.value } })}
+                        className="w-full px-4 py-2 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Estatura (cm)</label>
+                      <input 
+                        type="text"
+                        value={editingMedical.medicalData?.height}
+                        onChange={(e) => setEditingMedical({ ...editingMedical, medicalData: { ...editingMedical.medicalData!, height: e.target.value } })}
+                        className="w-full px-4 py-2 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Alergias</label>
+                      <input 
+                        type="text"
+                        value={editingMedical.medicalData?.allergies}
+                        onChange={(e) => setEditingMedical({ ...editingMedical, medicalData: { ...editingMedical.medicalData!, allergies: e.target.value } })}
+                        className="w-full px-4 py-2 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Intolerancias</label>
+                      <input 
+                        type="text"
+                        value={editingMedical.medicalData?.intolerances}
+                        onChange={(e) => setEditingMedical({ ...editingMedical, medicalData: { ...editingMedical.medicalData!, intolerances: e.target.value } })}
+                        className="w-full px-4 py-2 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Antecedentes Médicos</label>
+                    <textarea 
+                      value={editingMedical.medicalData?.antecedents}
+                      onChange={(e) => setEditingMedical({ ...editingMedical, medicalData: { ...editingMedical.medicalData!, antecedents: e.target.value } })}
+                      className="w-full px-4 py-2 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm h-20"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Discapacidad</label>
+                      <div className="flex space-x-4 py-2">
+                        <label className="flex items-center space-x-2">
+                          <input 
+                            type="radio" 
+                            checked={editingMedical.medicalData?.disability?.has === true} 
+                            onChange={() => setEditingMedical({ ...editingMedical, medicalData: { ...editingMedical.medicalData!, disability: { ...editingMedical.medicalData!.disability!, has: true } } })}
+                          />
+                          <span className="text-sm">Sí</span>
+                        </label>
+                        <label className="flex items-center space-x-2">
+                          <input 
+                            type="radio" 
+                            checked={editingMedical.medicalData?.disability?.has === false} 
+                            onChange={() => setEditingMedical({ ...editingMedical, medicalData: { ...editingMedical.medicalData!, disability: { has: false, description: "" } } })}
+                          />
+                          <span className="text-sm">No</span>
+                        </label>
+                      </div>
+                      {editingMedical.medicalData?.disability?.has && (
+                        <input 
+                          type="text"
+                          value={editingMedical.medicalData.disability.description}
+                          onChange={(e) => setEditingMedical({ ...editingMedical, medicalData: { ...editingMedical.medicalData!, disability: { ...editingMedical.medicalData!.disability!, description: e.target.value } } })}
+                          className="w-full px-4 py-2 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-xs"
+                          placeholder="Descripción"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Medicamentos</label>
+                      <input 
+                        type="text"
+                        value={editingMedical.medicalData?.medications}
+                        onChange={(e) => setEditingMedical({ ...editingMedical, medicalData: { ...editingMedical.medicalData!, medications: e.target.value } })}
+                        className="w-full px-4 py-2 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex space-x-4">
+                    <button 
+                      type="submit"
+                      className="flex-1 bg-primary text-white py-3 rounded-2xl font-bold uppercase hover:bg-primary-dark transition-all"
+                    >
+                      Guardar Cambios
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setEditingMedical(null)}
+                      className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-2xl font-bold uppercase hover:bg-gray-200 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === "stats" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard title="Total Inscritos" value={registrations.length} color="primary" />
-          <StatCard title="Pagos Aprobados ($)" value={totalUSDApproved.toFixed(2)} isUSD color="green" />
-          <StatCard title="Membresías Vigentes" value={registrations.filter(r => r.opsStatus === Status.APPROVED).length} color="blue" />
-          <StatCard title="Asistentes (Check-In)" value={registrations.filter(r => r.checkedIn).length} color="amber" />
+        <div className="space-y-12">
+          {/* Main Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard title="Total Inscritos" value={registrations.length} color="primary" />
+            <StatCard title="Pagos Aprobados ($)" value={totalUSDApproved.toFixed(2)} isUSD color="green" />
+            <StatCard title="Membresías Vigentes" value={registrations.filter(r => r.opsStatus === Status.APPROVED).length} color="blue" />
+            <StatCard title="Asistentes (General)" value={registrations.filter(r => r.checkedIn).length} color="amber" />
+          </div>
+
+          {/* Phase Attendance Stats */}
+          {config?.phases && config.phases.length > 0 && (
+            <div className="space-y-6">
+              <div className="flex items-center space-x-2 border-b border-gray-100 pb-4">
+                <Users className="w-5 h-5 text-gray-400" />
+                <h3 className="text-xl font-black text-gray-900 uppercase italic">Asistencia por Fase</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {config.phases.map((phase) => {
+                  const attendees = registrations.filter(r => r.phaseAttendance?.[phase.id]?.attended).length;
+                  return (
+                    <div 
+                      key={phase.id} 
+                      className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between group hover:shadow-md transition-all border-l-4"
+                      style={{ borderLeftColor: phase.color }}
+                    >
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{phase.name}</p>
+                        <p className="text-3xl font-black italic text-gray-800">{attendees}</p>
+                      </div>
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-50 transition-colors"
+                        style={{ color: phase.color }}
+                      >
+                        <UserCheck className="w-5 h-5" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -469,6 +802,7 @@ function StaffManager() {
             >
               <option value="admin">Administración</option>
               <option value="ops">Operaciones</option>
+              <option value="risk">Gestión de Riesgo</option>
               <option value="superadmin">Super Admin</option>
             </select>
           </div>
@@ -510,9 +844,10 @@ function StaffManager() {
                     <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg ${
                       member.role === 'superadmin' ? 'bg-purple-100 text-purple-600' :
                       member.role === 'admin' ? 'bg-blue-100 text-blue-600' :
+                      member.role === 'risk' ? 'bg-amber-100 text-amber-600' :
                       'bg-orange-100 text-orange-600'
                     }`}>
-                      {member.role === 'admin' ? 'Administración' : member.role === 'ops' ? 'Operaciones' : 'Super Admin'}
+                      {member.role === 'admin' ? 'Administración' : member.role === 'ops' ? 'Operaciones' : member.role === 'risk' ? 'Gestión de Riesgo' : 'Super Admin'}
                     </span>
                   </td>
                   <td className="py-4 px-4 font-mono text-xs text-gray-500">{member.password}</td>
@@ -680,10 +1015,36 @@ function ConfigEditor() {
     eventDescription: "",
     headerTagline: "",
     locationUrl: "",
-    photoAlbumUrl: ""
+    photoAlbumUrl: "",
+    phases: []
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const addPhase = () => {
+    const newPhase: EventPhase = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: "",
+      location: "",
+      locationUrl: "",
+      date: "",
+      time: "",
+      minAmount: 0,
+      color: DARK_PALETTE[0]
+    };
+    setConfig({ ...config, phases: [...(config.phases || []), newPhase] });
+  };
+
+  const removePhase = (id: string) => {
+    setConfig({ ...config, phases: (config.phases || []).filter(p => p.id !== id) });
+  };
+
+  const updatePhase = (id: string, field: keyof EventPhase, value: any) => {
+    setConfig({
+      ...config,
+      phases: (config.phases || []).map(p => p.id === id ? { ...p, [field]: value } : p)
+    });
+  };
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -755,59 +1116,13 @@ function ConfigEditor() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Unidad Scout</label>
+          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Monto Total del Evento ($)</label>
           <input 
-            type="text"
-            value={config.scoutUnit}
-            onChange={(e) => setConfig({ ...config, scoutUnit: e.target.value })}
+            type="number"
+            value={config.totalCostUSD}
+            onChange={(e) => setConfig({ ...config, totalCostUSD: parseFloat(e.target.value) })}
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
-            placeholder="Ej: Clan"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Fecha del Evento</label>
-          <input 
-            type="text"
-            value={config.eventDate}
-            onChange={(e) => setConfig({ ...config, eventDate: e.target.value })}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
-            placeholder="Ej: 15-18 de Octubre, 2026"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Ubicación (Texto)</label>
-          <input 
-            type="text"
-            value={config.eventLocation}
-            onChange={(e) => setConfig({ ...config, eventLocation: e.target.value })}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
-            placeholder="Ej: Hacienda El Limón, Ávila"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Link Ubicación (Google Maps)</label>
-          <input 
-            type="text"
-            value={config.locationUrl || ""}
-            onChange={(e) => setConfig({ ...config, locationUrl: e.target.value })}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
-            placeholder="Ej: https://maps.app.goo.gl/..."
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Link Álbum de Fotos (Drive/Flickr)</label>
-          <input 
-            type="text"
-            value={config.photoAlbumUrl || ""}
-            onChange={(e) => setConfig({ ...config, photoAlbumUrl: e.target.value })}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
-            placeholder="Ej: https://drive.google.com/..."
+            placeholder="Ej: 35.00"
           />
         </div>
         <div className="space-y-1.5">
@@ -821,16 +1136,113 @@ function ConfigEditor() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Monto Total del Evento ($)</label>
-          <input 
-            type="number"
-            value={config.totalCostUSD}
-            onChange={(e) => setConfig({ ...config, totalCostUSD: parseFloat(e.target.value) })}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary text-sm font-medium"
-            placeholder="Ej: 35.00"
-          />
+      <div className="space-y-6 pt-4 border-t border-gray-100">
+        <div className="flex justify-between items-center">
+          <h4 className="text-xs font-black uppercase tracking-[0.2em] text-primary">Cronograma de Fases del Evento</h4>
+          <button 
+            onClick={addPhase}
+            className="bg-primary/10 text-primary hover:bg-primary hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center space-x-2"
+          >
+            <Plus className="w-3 h-3" />
+            <span>Agregar Fase</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+          {(config.phases || []).map((phase, idx) => (
+            <div key={phase.id} className="bg-gray-50 p-6 rounded-2xl border border-gray-100 relative group animate-in fade-in slide-in-from-top-2 duration-300">
+              <button 
+                onClick={() => removePhase(phase.id)}
+                className="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors"
+                title="Eliminar Fase"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Nombre Fase</label>
+                  <input 
+                    type="text"
+                    value={phase.name}
+                    onChange={(e) => updatePhase(phase.id, "name", e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="Ej: Fase 1: Mística"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Ubicación</label>
+                  <input 
+                    type="text"
+                    value={phase.location}
+                    onChange={(e) => updatePhase(phase.id, "location", e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="Ej: Sede Scout"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Maps Link</label>
+                  <input 
+                    type="text"
+                    value={phase.locationUrl}
+                    onChange={(e) => updatePhase(phase.id, "locationUrl", e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="https://maps..."
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Monto Min ($)</label>
+                  <input 
+                    type="number"
+                    value={phase.minAmount}
+                    onChange={(e) => updatePhase(phase.id, "minAmount", parseFloat(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="Ej: 10"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Color QR</label>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {DARK_PALETTE.map(color => (
+                      <button
+                        key={color}
+                        onClick={() => updatePhase(phase.id, "color", color)}
+                        className={`w-5 h-5 rounded-full border-2 transition-all ${phase.color === color ? 'border-primary ring-1 ring-primary/30 scale-110' : 'border-transparent'}`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Fecha</label>
+                    <input 
+                      type="date"
+                      value={phase.date}
+                      onChange={(e) => updatePhase(phase.id, "date", e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Horario</label>
+                    <input 
+                      type="text"
+                      value={phase.time}
+                      onChange={(e) => updatePhase(phase.id, "time", e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                      placeholder="Ej: 8am - 5pm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+          {(config.phases || []).length === 0 && (
+            <div className="p-12 text-center border-2 border-dashed border-gray-100 rounded-3xl">
+              <Layers className="w-8 h-8 text-gray-200 mx-auto mb-3" />
+              <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">No se han definido fases aún</p>
+            </div>
+          )}
         </div>
       </div>
 

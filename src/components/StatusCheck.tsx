@@ -3,8 +3,9 @@ import { collection, query, where, onSnapshot, doc, getDoc } from "firebase/fire
 import { db } from "../lib/firebase";
 import { Registration, Status, Payment, Config } from "../types";
 import { QRCodeSVG } from "qrcode.react";
-import { Search, Loader2, ChevronLeft, QrCode, AlertTriangle, CheckCircle, MessageSquare, CreditCard } from "lucide-react";
+import { Search, Loader2, ChevronLeft, QrCode, AlertTriangle, CheckCircle, MessageSquare, CreditCard, Download, HeartPulse } from "lucide-react";
 import { handleFirestoreError, OperationType } from "../lib/error-handler";
+import { generateMedicalPDF } from "../lib/pdf-utils";
 
 interface Props {
   onBack: () => void;
@@ -90,6 +91,12 @@ export default function StatusCheck({ onBack }: Props) {
   const totalUSDApproved = payments
     .filter(p => p.status === Status.APPROVED)
     .reduce((acc, p) => acc + p.amountUSD, 0);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const sortedPhases = [...(config?.phases || [])].sort((a, b) => a.date.localeCompare(b.date));
+  const upcomingPhase = sortedPhases.find(p => p.date >= todayStr);
+  const minRequiredNow = upcomingPhase ? upcomingPhase.minAmount : (config?.totalCostUSD || 0);
+  const isQualifiedByPhase = totalUSDApproved >= minRequiredNow;
 
   const rawBalanceDue = config ? Math.max(0, config.totalCostUSD - totalUSDApproved) : 0;
   const balanceDue = rawBalanceDue < 0.01 ? 0 : rawBalanceDue;
@@ -208,12 +215,52 @@ export default function StatusCheck({ onBack }: Props) {
                     </div>
                  </div>
 
-                 {balanceDue <= 0 ? (
+                 {registration.medicalData && (
+                   <button 
+                    onClick={() => generateMedicalPDF(registration, config)}
+                    className="w-full flex items-center justify-center space-x-3 bg-amber-600/10 text-amber-700 p-4 rounded-2xl border border-amber-200 hover:bg-amber-600/20 transition-all group"
+                   >
+                     <HeartPulse className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                     <div className="text-left">
+                       <p className="text-[10px] font-black uppercase leading-tight italic">Ficha Médica Digital</p>
+                       <p className="text-[9px] opacity-70">Haz clic para descargar en PDF</p>
+                     </div>
+                     <Download className="ml-auto w-4 h-4" />
+                   </button>
+                 )}
+
+                 {!registration.medicalData && (
+                    <div className="bg-red-50 p-5 rounded-2xl border border-red-100 flex items-start space-x-3">
+                      <HeartPulse className="text-red-500 w-6 h-6 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-red-900 font-bold text-sm uppercase">Ficha Médica Pendiente</p>
+                        <p className="text-red-700 text-xs mt-1 italic font-medium">Debes completar tu ficha médica al reportar una cuota para activar tu credencial.</p>
+                      </div>
+                    </div>
+                 )}
+
+                 {balanceDue <= 0 && registration.medicalData ? (
                     <div className="bg-green-50 p-5 rounded-2xl border border-green-100 flex items-start space-x-3">
                       <CheckCircle className="text-green-500 w-6 h-6 mt-0.5 shrink-0" />
                       <div>
                         <p className="text-green-900 font-bold text-sm uppercase">¡Inscripción Completada!</p>
                         <p className="text-green-700 text-xs mt-1">Has completado el proceso de pago. {registration.opsStatus !== Status.APPROVED ? "Tu credencial se activará apenas operaciones valide tu membresía." : "¡Ya puedes usar tu credencial digital!"}</p>
+                      </div>
+                    </div>
+                 ) : isQualifiedByPhase && registration.medicalData ? (
+                    <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 flex items-start space-x-3">
+                      <CheckCircle className="text-blue-500 w-6 h-6 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-blue-900 font-bold text-sm uppercase">¡Solvente para {upcomingPhase?.name || 'Evento'}!</p>
+                        <p className="text-blue-700 text-xs mt-1">Has cubierto el monto mínimo requerido a la fecha (${minRequiredNow}). Tu credencial está activa.</p>
+                      </div>
+                    </div>
+                 ) : balanceDue <= 0 && !registration.medicalData ? (
+                    <div className="bg-amber-50 p-5 rounded-2xl border border-amber-100 flex items-start space-x-3">
+                      <AlertTriangle className="text-amber-500 w-6 h-6 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-amber-900 font-bold text-sm uppercase">Pago Completo - Datos Faltantes</p>
+                        <p className="text-amber-700 text-xs mt-1">Tu pago está completo pero falta tu ficha médica. Por favor ve a la sección de "Registro y Cuotas", ingresa tu cédula y completa la información médica pendiente.</p>
                       </div>
                     </div>
                  ) : (
@@ -267,15 +314,25 @@ export default function StatusCheck({ onBack }: Props) {
 
             {/* Right: QR Code */}
             <div className="flex flex-col items-center justify-center p-10 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-              {balanceDue <= 0 && registration.opsStatus === Status.APPROVED ? (
+              {isQualifiedByPhase && registration.opsStatus === Status.APPROVED && registration.medicalData ? (
                 <div className="text-center space-y-6">
                   <div className="bg-white p-6 rounded-3xl shadow-xl inline-block border border-gray-100">
-                    <QRCodeSVG 
-                      value={registration.idNumber} 
-                      size={200}
-                      level="H"
-                      includeMargin={true}
-                    />
+                    {(() => {
+                      const qualifiedPhases = sortedPhases
+                        .filter(p => totalUSDApproved >= p.minAmount)
+                        .sort((a, b) => b.minAmount - a.minAmount);
+                      const qrColor = qualifiedPhases.length > 0 ? qualifiedPhases[0].color : "#000000";
+                      
+                      return (
+                        <QRCodeSVG 
+                          value={registration.idNumber} 
+                          size={200}
+                          level="H"
+                          includeMargin={true}
+                          fgColor={qrColor}
+                        />
+                      );
+                    })()}
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-center space-x-2 text-primary font-bold text-xs uppercase tracking-widest">
@@ -293,8 +350,8 @@ export default function StatusCheck({ onBack }: Props) {
                   <div className="space-y-1 text-center">
                     <p className="font-bold text-sm uppercase text-gray-400 tracking-widest">Código Bloqueado</p>
                     <div className="space-y-1">
-                      {balanceDue > 0 && (
-                        <p className="text-[10px] text-amber-500 font-bold uppercase tracking-tighter">Falta completar pago (${balanceDue.toFixed(2)})</p>
+                      {!isQualifiedByPhase && balanceDue > 0 && (
+                        <p className="text-[10px] text-amber-500 font-bold uppercase tracking-tighter">Falta monto para {upcomingPhase?.name || 'Inscripción'} (${(minRequiredNow - totalUSDApproved).toFixed(2)})</p>
                       )}
                       {registration.opsStatus !== Status.APPROVED && (
                         <p className="text-[10px] text-blue-500 font-bold uppercase tracking-tighter">Falta Validación Institucional</p>

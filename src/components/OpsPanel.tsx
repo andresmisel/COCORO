@@ -5,6 +5,7 @@ import { db } from "../lib/firebase";
 import { MessageSquare, Download, CheckCircle, XCircle, Clock, QrCode, UserCheck } from "lucide-react";
 import { handleFirestoreError, OperationType } from "../lib/error-handler";
 import { Html5QrcodeScanner } from "html5-qrcode";
+import * as XLSX from "xlsx";
 
 interface Props {
   registrations: Registration[];
@@ -21,6 +22,9 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [obsId, setObsId] = useState<string | null>(null);
   const [obsText, setObsText] = useState("");
+  const [selectedPhase, setSelectedPhase] = useState<string>("general");
+
+  const phases = config?.phases || [];
 
   const updateStatus = async (id: string, status: Status) => {
     try {
@@ -43,23 +47,79 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
     }
   };
 
-  const handleManualCheckIn = async (id: string) => {
+  const handleManualCheckIn = async (id: string, phaseId: string = "general") => {
     try {
-      await updateDoc(doc(db, "registrations", id), { 
-        checkedIn: true, 
+      const updateData: any = {
+        checkedIn: true,
         checkInTime: new Date().toISOString(),
         checkedInBy: staffName
-      });
+      };
+
+      if (phaseId !== "general") {
+        updateData[`phaseAttendance.${phaseId}`] = {
+          attended: true,
+          time: new Date().toISOString(),
+          by: staffName
+        };
+      }
+
+      await updateDoc(doc(db, "registrations", id), updateData);
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, `registrations/${id}`);
     }
   };
 
+  const exportPhaseAttendance = (phaseId: string) => {
+    const phase = phases.find(p => p.id === phaseId);
+    const phaseName = phase?.name || "General";
+    
+    const attendanceData = registrations.map(r => {
+      const att = phaseId === 'general' ? { attended: r.checkedIn, time: r.checkInTime, by: r.checkedInBy } : r.phaseAttendance?.[phaseId];
+      return {
+        Nombre: `${r.firstName} ${r.lastName}`,
+        Cedula: r.idNumber,
+        Grupo: r.scoutGroup,
+        Asistio: att?.attended ? "SI" : "NO",
+        Fecha_Hora: att?.time ? new Date(att.time).toLocaleString() : "N/A",
+        Marcado_Por: (att?.by || "N/A").replace("Sistema (Leindenz)", "Sistema Admin").replace("Sistema (Andres)", "Sistema Ops")
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(attendanceData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Asistencia");
+    XLSX.writeFile(wb, `Asistencia_${phaseName.replace(/\s+/g, '_')}.xlsx`);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100 gap-4">
-        <h3 className="font-bold uppercase italic text-gray-500 text-xs tracking-widest pl-2">Membresía & Control de Acceso</h3>
+        <div className="flex flex-col space-y-1">
+          <h3 className="font-bold uppercase italic text-gray-500 text-xs tracking-widest pl-2">Control de Acceso & Asistencia</h3>
+          <div className="flex items-center space-x-2 pl-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase">Fase Activa:</span>
+            <select 
+              value={selectedPhase}
+              onChange={(e) => setSelectedPhase(e.target.value)}
+              className="text-[10px] font-bold uppercase text-primary bg-primary/5 px-2 py-1 rounded-lg outline-none cursor-pointer"
+            >
+              <option value="general">Membresía General</option>
+              {phases.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
         <div className="flex flex-wrap gap-2">
+          {selectedPhase !== 'general' && (
+            <button 
+              onClick={() => exportPhaseAttendance(selectedPhase)}
+              className="flex items-center space-x-2 bg-green-50 text-green-600 px-4 py-2 rounded-xl font-bold uppercase text-xs hover:bg-green-100 transition-all border border-green-100"
+            >
+              <Download className="w-4 h-4" />
+              <span>Reporte Fase</span>
+            </button>
+          )}
           <button 
             onClick={() => setShowScanner(!showScanner)}
             className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded-xl font-bold uppercase text-xs hover:bg-primary-dark transition-all shadow-lg shadow-primary/20"
@@ -96,12 +156,42 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
                   const regDoc = snap.docs[0];
                   const regData = regDoc.data() as Registration;
                   
+                  if (selectedPhase !== "general") {
+                    const phase = phases.find(p => p.id === selectedPhase);
+                    const userPayments = payments.filter(p => p.idNumber === idNumber && p.status === Status.APPROVED);
+                    const totalPaid = userPayments.reduce((acc, p) => acc + p.amountUSD, 0);
+
+                    if (phase) {
+                      if (totalPaid < phase.minAmount) {
+                        alert(`❌ ACCESO DENEGADO: El participante no cubre el monto mínimo para esta fase ($${totalPaid.toFixed(2)}/${phase.minAmount}).`);
+                        return;
+                      }
+                      
+                      const updateObj: any = {
+                        [`phaseAttendance.${selectedPhase}`]: {
+                          attended: true,
+                          time: new Date().toISOString(),
+                          by: staffName
+                        }
+                      };
+                      // Also mark general check-in if not already
+                      if (!regData.checkedIn) {
+                        updateObj.checkedIn = true;
+                        updateObj.checkInTime = new Date().toISOString();
+                        updateObj.checkedInBy = staffName;
+                      }
+                      
+                      await updateDoc(doc(db, "registrations", regDoc.id), updateObj);
+                      alert(`✅ ¡Asistencia registrada para ${phase.name} - ${regData.firstName}!`);
+                      return;
+                    }
+                  }
+
                   if (regData.checkedIn) {
                     alert(`⚠️ ALERTA: El usuario ${regData.firstName} ${regData.lastName} YA SE ENCUENTRA EN EL EVENTO.\nEntrada registrada a las: ${new Date(regData.checkInTime!).toLocaleTimeString()}`);
                     return;
                   }
 
-                  // Check solvency
                   const userPayments = payments.filter(p => p.idNumber === idNumber && p.status === Status.APPROVED);
                   const totalPaid = userPayments.reduce((acc, p) => acc + p.amountUSD, 0);
                   const rawMissing = config ? Math.max(0, config.totalCostUSD - totalPaid) : 0;
@@ -169,7 +259,9 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
                         {reg.opsStatus === Status.APPROVED ? 'Vigente' : reg.opsStatus === Status.REJECTED ? 'Vencido' : 'Pendiente'}
                       </span>
                       {role === "superadmin" && reg.validatedBy && (
-                        <p className="text-[8px] text-gray-400 mt-0.5 uppercase font-bold tracking-tighter">Por: {reg.validatedBy}</p>
+                        <p className="text-[8px] text-gray-400 mt-0.5 uppercase font-bold tracking-tighter">
+                          Por: {reg.validatedBy.replace("Sistema (Leindenz)", "Sistema Admin").replace("Sistema (Andres)", "Sistema Ops")}
+                        </p>
                       )}
                       {/* Solvency Indicator */}
                       {(() => {
@@ -190,31 +282,40 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
                     )}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    {reg.checkedIn ? (
-                      <div className="flex flex-col items-center">
-                        <span className="text-green-600 font-bold text-[10px] uppercase tracking-widest flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" /> PRESENTE
-                        </span>
-                        <span className="text-[9px] text-gray-400 font-mono">{reg.checkInTime ? new Date(reg.checkInTime).toLocaleTimeString() : ''}</span>
-                        {role === "superadmin" && reg.checkedInBy && (
-                          <p className="text-[7px] text-gray-400 font-bold uppercase tracking-tighter">Por: {reg.checkedInBy}</p>
-                        )}
-                      </div>
-                    ) : (
-                      <button 
-                        onClick={() => handleManualCheckIn(reg.id)}
-                        disabled={
-                          (() => {
-                            const totalPaid = payments.filter(p => p.idNumber === reg.idNumber && p.status === Status.APPROVED).reduce((acc, p) => acc + p.amountUSD, 0);
-                            const rawMissing = config ? Math.max(0, config.totalCostUSD - totalPaid) : 0;
-                            return (rawMissing >= 0.01) || reg.opsStatus !== Status.APPROVED;
-                          })()
-                        }
-                        className="text-[10px] font-bold text-gray-400 border border-gray-200 px-2 py-0.5 rounded-full hover:bg-green-50 hover:text-green-600 hover:border-green-200 transition-all disabled:opacity-30 uppercase tracking-widest"
-                      >
-                        Marcar entrada
-                      </button>
-                    )}
+                    {(() => {
+                      const att = selectedPhase === 'general' ? { attended: reg.checkedIn, time: reg.checkInTime, by: reg.checkedInBy } : reg.phaseAttendance?.[selectedPhase];
+                      const totalPaid = payments.filter(p => p.idNumber === reg.idNumber && p.status === Status.APPROVED).reduce((acc, p) => acc + p.amountUSD, 0);
+                      const phase = phases.find(p => p.id === selectedPhase);
+                      const isSolventForPhase = selectedPhase === 'general' ? 
+                        (config ? (config.totalCostUSD - totalPaid < 0.01) : true) : 
+                        (phase ? totalPaid >= phase.minAmount : true);
+
+                      if (att?.attended) {
+                        return (
+                          <div className="flex flex-col items-center">
+                            <span className="text-green-600 font-bold text-[10px] uppercase tracking-widest flex items-center gap-1">
+                              <CheckCircle className="w-3 h-3" /> PRESENTE
+                            </span>
+                            <span className="text-[9px] text-gray-400 font-mono">{att.time ? new Date(att.time).toLocaleTimeString() : ''}</span>
+                            {role === "superadmin" && att.by && (
+                              <p className="text-[7px] text-gray-400 font-bold uppercase tracking-tighter">
+                                Por: {att.by.replace("Sistema (Leindenz)", "Sistema Admin").replace("Sistema (Andres)", "Sistema Ops")}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <button 
+                          onClick={() => handleManualCheckIn(reg.id, selectedPhase)}
+                          disabled={!isSolventForPhase || reg.opsStatus !== Status.APPROVED}
+                          className="text-[10px] font-bold text-gray-400 border border-gray-200 px-2 py-0.5 rounded-full hover:bg-green-50 hover:text-green-600 hover:border-green-200 transition-all disabled:opacity-30 uppercase tracking-widest"
+                        >
+                          {isSolventForPhase ? "Marcar entrada" : "Insolvente"}
+                        </button>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end space-x-1">
