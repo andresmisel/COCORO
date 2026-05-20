@@ -424,7 +424,7 @@ export default function VotingPlatform({ onBack }: Props) {
                 ) : (
                   <>
                     <Vote className="w-4 h-4" />
-                    <span>Someter Voto Secreto 🗳️</span>
+                    <span>Ejercer voto secreto 🗳️</span>
                   </>
                 )}
               </button>
