@@ -75,6 +75,15 @@ export interface Registration {
   checkedInBy?: string;
   checkInTime?: string;
   phaseAttendance?: { [phaseId: string]: { attended: boolean; time: string; by: string } };
+  votingRole?: "Delegado" | "Observador" | "";
+  createdAt: string;
+}
+
+export interface Candidate {
+  id: string;
+  firstName: string;
+  lastName: string;
+  photo: string; // Base64 encoding of image
   createdAt: string;
 }
 
@@ -92,6 +101,12 @@ export interface Config {
   locationUrl?: string;
   photoAlbumUrl?: string;
   phases?: EventPhase[];
+  votingActive?: boolean;
+  votingTitle?: string;
+  votingQuestion?: string;
+  votingDeadline?: string;
+  votingTargetUnit?: "Joven" | "Adulto" | "Ambos";
+  showVotingResults?: boolean;
 }
 
 export type StaffRole = "admin" | "ops" | "superadmin" | "risk" | null;

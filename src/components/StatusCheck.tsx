@@ -215,6 +215,19 @@ export default function StatusCheck({ onBack }: Props) {
                     </div>
                  </div>
 
+                 {registration.votingRole && (
+                    <div className="bg-blue-50 text-blue-950 p-4 rounded-xl border border-blue-100 flex items-center justify-between my-2">
+                      <div className="flex items-center space-x-3">
+                        <span className="text-xl">🗳️</span>
+                        <div>
+                          <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest leading-none mb-1">Rol de Votación</p>
+                          <p className="text-xs font-black text-blue-800 uppercase tracking-wider">{registration.votingRole}</p>
+                        </div>
+                      </div>
+                      <span className="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black uppercase tracking-widest">Habilitado</span>
+                    </div>
+                  )}
+
                  {registration.medicalData && (
                    <button 
                     onClick={() => generateMedicalPDF(registration, config)}

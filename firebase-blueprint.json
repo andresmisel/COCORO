@@ -54,6 +54,40 @@
         "eventDate": { "type": "string" },
         "eventLocation": { "type": "string" }
       }
+    },
+    "Candidate": {
+      "title": "Candidate",
+      "description": "Information about a voting candidate",
+      "type": "object",
+      "properties": {
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "photo": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["firstName", "lastName"]
+    },
+    "VoteAudit": {
+      "title": "Vote Audit",
+      "description": "Log of voter identity who cast a ballot to prevent double voting",
+      "type": "object",
+      "properties": {
+        "idNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "scoutGroup": { "type": "string" },
+        "votedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["idNumber", "name", "scoutGroup", "votedAt"]
+    },
+    "VoteBallot": {
+      "title": "Vote Ballot",
+      "description": "Secret ballot containing the candidate ID selected by a voter",
+      "type": "object",
+      "properties": {
+        "candidateId": { "type": "string" },
+        "votedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["candidateId", "votedAt"]
     }
   },
   "firestore": {
@@ -68,6 +102,18 @@
     "/config/{configId}": {
       "schema": "Config",
       "description": "Global configuration documents"
+    },
+    "/candidates/{candidateId}": {
+      "schema": "Candidate",
+      "description": "Collection of candidates printed on the ballot"
+    },
+    "/votes_audit/{auditId}": {
+      "schema": "VoteAudit",
+      "description": "Collection tracking voters who have voted"
+    },
+    "/votes_ballot/{ballotId}": {
+      "schema": "VoteBallot",
+      "description": "Collection containing anonymous votes"
     }
   }
 }

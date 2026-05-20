@@ -37,6 +37,16 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
     }
   };
 
+  const updateVotingRole = async (id: string, roleVal: "Delegado" | "Observador" | "") => {
+    try {
+      await updateDoc(doc(db, "registrations", id), { 
+        votingRole: roleVal
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, `registrations/${id}`);
+    }
+  };
+
   const saveObservation = async (id: string) => {
     try {
       await updateDoc(doc(db, "registrations", id), { opsObservations: obsText });
@@ -248,6 +258,17 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
                   <td className="px-6 py-4">
                     <p className="text-xs font-bold text-gray-800 uppercase">{reg.scoutGroup}</p>
                     <p className="text-[10px] text-gray-500 uppercase">{reg.membershipType}</p>
+                    <div className="mt-2">
+                      <select 
+                        value={reg.votingRole || ""}
+                        onChange={(e) => updateVotingRole(reg.id, e.target.value as "Delegado" | "Observador" | "")}
+                        className="text-[9px] font-black uppercase tracking-tighter text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg px-2 py-1 outline-none cursor-pointer transition-all w-full max-w-[130px]"
+                      >
+                        <option value="">¿Electoral?</option>
+                        <option value="Delegado">Delegado 🗳️</option>
+                        <option value="Observador">Observador 👁️</option>
+                      </select>
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex flex-col items-center space-y-1.5">

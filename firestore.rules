@@ -36,6 +36,21 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+
+    match /candidates/{candidateId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /votes_audit/{auditId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /votes_ballot/{ballotId} {
+      allow read: if true;
+      allow write: if true;
+    }
     
     // Default deny
     match /{document=**} {

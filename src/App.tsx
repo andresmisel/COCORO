@@ -23,11 +23,12 @@ import {
 import RegistrationForm from "./components/RegistrationForm";
 import StatusCheck from "./components/StatusCheck";
 import StaffLogin from "./components/StaffLogin";
+import VotingPlatform from "./components/VotingPlatform";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "./lib/firebase";
 import { Config } from "./types";
 
-type View = "home" | "register" | "status" | "staff";
+type View = "home" | "register" | "status" | "staff" | "voting";
 
 export default function App() {
   const [view, setView] = useState<View>("home");
@@ -84,6 +85,15 @@ export default function App() {
               >
                 Consultar
               </button>
+              {config?.votingActive && (
+                <button 
+                  onClick={() => navigate("voting")} 
+                  className={`hover:text-amber-100 transition-colors uppercase text-sm font-bold ${view === 'voting' ? 'border-b-2 border-amber-300 text-amber-300' : 'text-amber-300'}`}
+                  id="nav-voting"
+                >
+                  🗳️ Votaciones
+                </button>
+              )}
               <button 
                 onClick={() => navigate("staff")} 
                 className="bg-white text-primary px-4 py-1.5 rounded-full text-sm font-bold hover:bg-gray-100 transition-colors uppercase shadow-sm"
@@ -113,6 +123,9 @@ export default function App() {
               <div className="px-4 py-4 space-y-3 flex flex-col">
                 <button onClick={() => navigate("register")} className="text-left py-2 font-medium">Registro y Cuotas</button>
                 <button onClick={() => navigate("status")} className="text-left py-2 font-medium">Consultar Status</button>
+                {config?.votingActive && (
+                  <button onClick={() => navigate("voting")} className="text-left py-2 font-bold text-amber-300">🗳️ Votaciones</button>
+                )}
                 <button onClick={() => navigate("staff")} className="text-left py-2 font-medium font-bold italic">Acceso Staff</button>
               </div>
             </motion.div>
@@ -264,6 +277,18 @@ export default function App() {
               className="max-w-3xl mx-auto px-4 py-8"
             >
               <StatusCheck onBack={() => setView("home")} />
+            </motion.div>
+          )}
+
+          {view === "voting" && (
+            <motion.div
+              key="voting"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="max-w-3xl mx-auto px-4 py-8"
+            >
+              <VotingPlatform onBack={() => setView("home")} />
             </motion.div>
           )}
 
