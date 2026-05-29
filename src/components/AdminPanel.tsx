@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Registration, Status, PaymentMethod, Payment } from "../types";
 import { updateDoc, doc } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { Download, CheckCircle, XCircle, MessageSquare, Eye } from "lucide-react";
+import { Download, CheckCircle, XCircle, MessageSquare, Eye, Trash2 } from "lucide-react";
 import { handleFirestoreError, OperationType } from "../lib/error-handler";
 import ProofViewer from "./ProofViewer";
 
@@ -96,7 +96,7 @@ export default function AdminPanel({ registrations, payments, onExport, searchTe
                             </div>
                             <div className="flex items-center space-x-2">
                               <span className="text-[10px] font-bold bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded uppercase">Monto/Tasa</span>
-                              <span className="font-mono text-[10px] font-bold">Bs {p.amount.toFixed(2)} / {p.exchangeRate}</span>
+                              <span className="font-mono text-[10px] font-bold">Bs {Number(p.amount || 0).toFixed(2)} / {p.exchangeRate}</span>
                             </div>
                           </>
                         ) : (
@@ -110,7 +110,7 @@ export default function AdminPanel({ registrations, payments, onExport, searchTe
                             Eq. USD
                           </span>
                           <span className={`font-mono text-xs font-bold ${p.paymentMethod === PaymentMethod.TRANSFER ? 'text-primary' : 'text-green-600'}`}>
-                            ${p.amountUSD.toFixed(2)}
+                            ${Number(p.amountUSD || 0).toFixed(2)}
                           </span>
                         </div>
                         {p.proofUrl && (
@@ -166,6 +166,23 @@ export default function AdminPanel({ registrations, payments, onExport, searchTe
                         >
                           <CheckCircle className="w-4 h-4" />
                         </button>
+                        {role === "superadmin" && (
+                          <button 
+                            onClick={async () => {
+                              try {
+                                const { deleteDoc, doc } = await import("firebase/firestore");
+                                await deleteDoc(doc(db, "payments", p.id!));
+                              } catch (e) {
+                                console.error(e);
+                                alert("Error al eliminar");
+                              }
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                            title="Eliminar permanentemente"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

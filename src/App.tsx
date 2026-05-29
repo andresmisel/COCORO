@@ -18,17 +18,23 @@ import {
   ExternalLink,
   Layers,
   Clock,
-  HeartPulse
+  HeartPulse,
+  ChevronLeft,
+  CreditCard,
+  UserPlus
 } from "lucide-react";
 import RegistrationForm from "./components/RegistrationForm";
 import StatusCheck from "./components/StatusCheck";
 import StaffLogin from "./components/StaffLogin";
 import VotingPlatform from "./components/VotingPlatform";
+import GroupAttachmentsSection from "./components/GroupAttachmentsSection";
+import ParticipantNews from "./components/ParticipantNews";
+import EventQuestionnaireSection from "./components/EventQuestionnaireSection";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "./lib/firebase";
 import { Config } from "./types";
 
-type View = "home" | "register" | "status" | "staff" | "voting";
+type View = "home" | "register" | "payment" | "status" | "staff" | "voting" | "evaluation";
 
 export default function App() {
   const [view, setView] = useState<View>("home");
@@ -50,7 +56,6 @@ export default function App() {
     setView(newView);
     setIsMenuOpen(false);
   };
-// ... rest of the component
 
   return (
     <div className="min-h-screen bg-white">
@@ -71,12 +76,19 @@ export default function App() {
 
             {/* Desktop Menu */}
             <div className="hidden md:flex space-x-8 items-center">
+              <button
+                  onClick={() => navigate("register")} 
+                  className={`hover:text-gray-200 transition-colors uppercase text-sm font-medium ${view === 'register' ? 'border-b-2 border-white' : ''}`}
+                  id="nav-register"
+                >
+                  Registro
+                </button>
               <button 
-                onClick={() => navigate("register")} 
-                className={`hover:text-gray-200 transition-colors uppercase text-sm font-medium ${view === 'register' ? 'border-b-2 border-white' : ''}`}
-                id="nav-register"
+                onClick={() => navigate("payment")} 
+                className={`hover:text-gray-200 transition-colors uppercase text-sm font-medium ${view === 'payment' ? 'border-b-2 border-white' : ''}`}
+                id="nav-payment"
               >
-                Registro y Cuotas
+                Cuota
               </button>
               <button 
                 onClick={() => navigate("status")} 
@@ -85,6 +97,15 @@ export default function App() {
               >
                 Consultar
               </button>
+              {config?.questionnaireActive && (
+                <button 
+                  onClick={() => navigate("evaluation")} 
+                  className={`hover:text-gray-200 transition-colors uppercase text-sm font-medium ${view === 'evaluation' ? 'border-b-2 border-white' : ''}`}
+                  id="nav-evaluation"
+                >
+                  Evaluación
+                </button>
+              )}
               {config?.votingActive && (
                 <button 
                   onClick={() => navigate("voting")} 
@@ -121,8 +142,12 @@ export default function App() {
               className="md:hidden bg-primary-dark border-t border-primary-light"
             >
               <div className="px-4 py-4 space-y-3 flex flex-col">
-                <button onClick={() => navigate("register")} className="text-left py-2 font-medium">Registro y Cuotas</button>
+                <button onClick={() => navigate("register")} className="text-left py-2 font-medium">Registro</button>
+                <button onClick={() => navigate("payment")} className="text-left py-2 font-medium">Cuota</button>
                 <button onClick={() => navigate("status")} className="text-left py-2 font-medium">Consultar Status</button>
+                {config?.questionnaireActive && (
+                  <button onClick={() => navigate("evaluation")} className="text-left py-2 font-medium">Evaluación</button>
+                )}
                 {config?.votingActive && (
                   <button onClick={() => navigate("voting")} className="text-left py-2 font-bold text-amber-300">🗳️ Votaciones</button>
                 )}
@@ -154,14 +179,26 @@ export default function App() {
                 {config?.eventDescription || "Bienvenido a COCORO, la plataforma oficial para el registro, validación y control de asistencia al evento de la unidad de clan más esperado del año."}
               </p>
               
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto px-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto px-2">
                 <button 
                   onClick={() => navigate("register")}
                   className="group relative overflow-hidden bg-primary text-white p-6 md:p-8 rounded-3xl flex flex-col items-center justify-center space-y-4 hover:shadow-xl transition-all hover:-translate-y-1"
                   id="home-btn-register"
                 >
-                  <ClipboardCheck className="w-10 h-10 md:w-12 md:h-12" />
-                  <span className="text-xl md:text-2xl font-bold uppercase">Formulario de Registro y Reporte de Cuotas</span>
+                  <UserPlus className="w-10 h-10 md:w-12 md:h-12 text-white/90" />
+                  <span className="text-lg md:text-xl font-black uppercase tracking-tight">Registro</span>
+                  <p className="text-xs text-white/70 max-w-xs font-medium">Inscribete y registra tus datos y ficha médica sin necesidad de pagar todavía.</p>
+                  <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+
+                <button 
+                  onClick={() => navigate("payment")}
+                  className="group relative overflow-hidden bg-amber-500 text-white p-6 md:p-8 rounded-3xl flex flex-col items-center justify-center space-y-4 hover:shadow-xl transition-all hover:-translate-y-1 shadow-md shadow-amber-500/10"
+                  id="home-btn-payment"
+                >
+                  <CreditCard className="w-10 h-10 md:w-12 md:h-12 text-white/95" />
+                  <span className="text-lg md:text-xl font-black uppercase tracking-tight">Cuota</span>
+                  <p className="text-xs text-white/80 max-w-xs font-medium">Registra o abona un pago mediante transferencia o efectivo.</p>
                   <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
                 
@@ -170,8 +207,9 @@ export default function App() {
                   className="group relative overflow-hidden border-2 border-primary text-primary p-6 md:p-8 rounded-3xl flex flex-col items-center justify-center space-y-4 hover:bg-primary/5 hover:shadow-lg transition-all hover:-translate-y-1"
                   id="home-btn-status"
                 >
-                  <Search className="w-10 h-10 md:w-12 md:h-12" />
-                  <span className="text-xl md:text-2xl font-bold uppercase">Consultar Status</span>
+                  <Search className="w-10 h-10 md:w-12 md:h-12 text-primary" />
+                  <span className="text-lg md:text-xl font-black uppercase tracking-tight">Consultar Status</span>
+                  <p className="text-xs text-gray-500 max-w-xs font-medium">Verifica el estado de tus validaciones y saldo aprobado.</p>
                   <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
               </div>
@@ -195,16 +233,34 @@ export default function App() {
                             <Layers className="w-6 h-6" />
                           </div>
                           <div className="flex flex-col items-end">
-                            <div className="flex items-center space-x-1 text-primary">
-                              <CalendarCheck className="w-3 h-3" />
-                              <span className="text-[10px] font-black uppercase">
-                                {phase.date ? new Date(phase.date + "T00:00:00").toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : "N/A"}
-                              </span>
-                            </div>
-                            <div className="flex items-center space-x-1 text-gray-400">
-                              <Clock className="w-3 h-3" />
-                              <span className="text-[10px] font-bold">{phase.time}</span>
-                            </div>
+                            {(() => {
+                              const formatD = (dStr?: string) => {
+                                if (!dStr) return "";
+                                const parts = dStr.split('-');
+                                if (parts.length === 3) {
+                                  // Assume YYYY-MM-DD
+                                  const [y, m, d] = parts.map(Number);
+                                  return new Date(y, m - 1, d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+                                }
+                                return dStr;
+                              };
+
+                              const startD = phase.startDate || phase.date || "";
+                              const endD = phase.endDate || phase.date || "";
+                              const startT = phase.startTime || phase.time || "00:00";
+                              const endT = phase.endTime || "23:59";
+
+                              return (
+                                <>
+                                  <div className="flex items-center space-x-1 text-primary">
+                                    <CalendarCheck className="w-3.5 h-3.5" />
+                                    <span className="text-[10px] font-black uppercase text-right">
+                                        {formatD(startD)} {startT} al {formatD(endD)} {endT}
+                                    </span>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
 
@@ -237,7 +293,7 @@ export default function App() {
                     <div className="bg-primary/10 p-4 rounded-3xl text-primary mb-6">
                       <Image className="w-10 h-10" />
                     </div>
-                    <h2 className="text-3xl md:text-4xl font-black text-gray-900 uppercase italic tracking-tighter mb-4">Álbum de Fotos</h2>
+                    <h2 className="text-3xl md:text-4xl font-black text-gray-950 uppercase italic tracking-tighter mb-4">Álbum de Fotos</h2>
                     <p className="text-gray-600 max-w-lg mx-auto mb-8 text-sm md:text-base">
                       Accede a nuestro álbum oficial para revivir los mejores momentos, descargar tus fotos o compartir las que tomaste durante el evento.
                     </p>
@@ -253,6 +309,14 @@ export default function App() {
                   </div>
                 </div>
               )}
+
+              <div id="noticias-section" className="mt-16 border-t border-gray-100 pt-16">
+                <ParticipantNews isSection={true} />
+              </div>
+
+              {config?.attachmentsActive && (
+                <GroupAttachmentsSection config={config} />
+              )}
             </motion.div>
           )}
 
@@ -264,7 +328,33 @@ export default function App() {
               exit={{ opacity: 0, x: -20 }}
               className="max-w-3xl mx-auto px-4 py-8"
             >
-              <RegistrationForm onBack={() => setView("home")} />
+              {config?.registrationDeadline && new Date() > new Date(config.registrationDeadline) ? (
+                <div className="p-8 border-2 border-red-500 bg-red-50 rounded-3xl text-center space-y-4">
+                  <h3 className="font-bold text-lg text-red-700">El plazo de registro para el evento ya finalizó.</h3>
+                </div>
+              ) : (
+                <RegistrationForm 
+                  onBack={() => setView("home")} 
+                  initialMode="register" 
+                  onSwitchMode={(mode) => setView(mode === "payment" ? "payment" : "register")}
+                />
+              )}
+            </motion.div>
+          )}
+
+          {view === "payment" && (
+            <motion.div
+              key="payment"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="max-w-3xl mx-auto px-4 py-8"
+            >
+              <RegistrationForm 
+                onBack={() => setView("home")} 
+                initialMode="payment" 
+                onSwitchMode={(mode) => setView(mode === "payment" ? "payment" : "register")}
+              />
             </motion.div>
           )}
 
@@ -289,6 +379,34 @@ export default function App() {
               className="max-w-3xl mx-auto px-4 py-8"
             >
               <VotingPlatform onBack={() => setView("home")} />
+            </motion.div>
+          )}
+
+          {view === "evaluation" && config?.questionnaireActive && (
+            <motion.div
+              key="evaluation"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="max-w-4xl mx-auto px-4 py-8"
+            >
+              <div className="mb-6 flex justify-start">
+                <button 
+                  onClick={() => setView("home")} 
+                  className="flex items-center space-x-1.5 text-xs font-bold text-gray-500 uppercase tracking-widest hover:text-primary transition-colors group"
+                >
+                  <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+                  <span>Volver al Inicio</span>
+                </button>
+              </div>
+              {config ? (
+                <EventQuestionnaireSection config={config} />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Cargando...</p>
+                </div>
+              )}
             </motion.div>
           )}
 

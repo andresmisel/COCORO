@@ -1,7 +1,7 @@
 export const DARK_PALETTE = [
   "#1e3a8a", // Blue 900
   "#312e81", // Indigo 900
-  "#581c87", // Purple 900
+  "#581c87", // Purple 905
   "#701a75", // Fuchsia 900
   "#831843", // Pink 900
   "#7f1d1d", // Red 900
@@ -10,3 +10,13 @@ export const DARK_PALETTE = [
   "#14532d", // Green 900
   "#0f172a", // Slate 900
 ];
+
+export const SCOUT_GROUPS = [
+  "ARISTIDES ROJAS",
+  "BICENTENARIO",
+  "DON BOSCO 21",
+  "HENRI PITTIER",
+  "LA SALLE LA COLINA",
+  "NEPTUNO",
+];
+

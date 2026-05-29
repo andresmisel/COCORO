@@ -45,6 +45,12 @@ export default function StaffLogin({ onBack }: Props) {
         } else if (password === "soporte321") {
           setRole("ops");
           setStaffName("Sistema Ops");
+        } else if (password === "comunicaciones321") {
+          setRole("comunicaciones");
+          setStaffName("Sistema Comunicaciones");
+        } else if (password === "scanner321") {
+          setRole("scanner");
+          setStaffName("Sistema Entrada");
         } else {
           setError("Clave de acceso incorrecta");
         }

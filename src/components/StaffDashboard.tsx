@@ -36,14 +36,18 @@ import {
   ExternalLink,
   Image,
   HeartPulse,
-  UserCheck
+  UserCheck,
+  ClipboardSignature
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { handleFirestoreError, OperationType } from "../lib/error-handler";
 import { DARK_PALETTE } from "../constants";
 import AdminPanel from "./AdminPanel";
+import ScanEntry from "./ScanEntry";
 import OpsPanel from "./OpsPanel";
 import SuperAdminPanel from "./SuperAdminPanel";
+import EvaluationDashboard from "./EvaluationDashboard";
+import ParticipantNews from "./ParticipantNews";
 import { generateMedicalPDF } from "../lib/pdf-utils";
 import { StaffMember } from "../types";
 
@@ -59,10 +63,17 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"list" | "progress" | "stats" | "config" | "staff_mgmt" | "medical">(
-    role === 'risk' ? "medical" : "list"
+  const [activeTab, setActiveTab] = useState<"list" | "progress" | "stats" | "config" | "staff_mgmt" | "medical" | "evaluation" | "noticias" | "scanner">(
+    role === 'scanner' ? "scanner" : role === 'risk' ? "medical" : role === 'comunicaciones' ? "noticias" : "list"
   );
   const [editingMedical, setEditingMedical] = useState<Registration | null>(null);
+
+  useEffect(() => {
+    if (role === "comunicaciones" || role === "superadmin") {
+      sessionStorage.setItem("prensa_auth", "true");
+      sessionStorage.setItem("prensa_author_name", staffName || "Prensa Oficial del Congreso");
+    }
+  }, [role, staffName]);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -77,7 +88,7 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
     };
     fetchConfig();
 
-    const qReg = query(collection(db, "registrations"), orderBy("createdAt", "desc"));
+    const qReg = query(collection(db, "registrations"));
     const unsubReg = onSnapshot(qReg, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Registration));
       setRegistrations(data);
@@ -132,6 +143,7 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
       case "ops": return "Panel de Operaciones";
       case "superadmin": return "Super Administrador";
       case "risk": return "Gestión de Riesgo";
+      case "comunicaciones": return "Panel de Comunicaciones";
       default: return "Dashboard";
     }
   };
@@ -230,6 +242,7 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
           Cedula: r.idNumber,
           Grupo: r.scoutGroup,
           Tipo_Membresia: r.membershipType,
+          Talla_Franela: r.tshirtSize || "S/T",
           Status_Membresia: getMembershipStatus(r.opsStatus),
           Validado_Por: (r.validatedBy || "N/A").replace("Sistema (Leindenz)", "Sistema Admin").replace("Sistema (Andres)", "Sistema Ops"),
           Email: r.email,
@@ -286,29 +299,33 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
       {/* Tabs / Actions Bar */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="flex overflow-x-auto pb-2 md:pb-0 bg-gray-100 p-1.5 rounded-2xl no-scrollbar">
-          {role !== 'risk' && (
+          {(role === "admin" || role === "superadmin") && (
             <button 
               onClick={() => setActiveTab("list")}
               className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'list' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <DollarSign className="w-4 h-4" />
-              <span>Cobranza</span>
+              <span>Pagos</span>
             </button>
           )}
-          <button 
-            onClick={() => setActiveTab("progress")}
-            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'progress' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Participantes</span>
-          </button>
-          <button 
-            onClick={() => setActiveTab("stats")}
-            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'stats' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>Métricas</span>
-          </button>
+          {role !== "scanner" && (
+            <button 
+              onClick={() => setActiveTab("progress")}
+              className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'progress' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Participantes</span>
+            </button>
+          )}
+          {role !== "scanner" && (
+            <button 
+              onClick={() => setActiveTab("stats")}
+              className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'stats' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Métricas</span>
+            </button>
+          )}
           {(role === 'superadmin' || role === 'risk') && (
             <button 
               onClick={() => setActiveTab("medical")}
@@ -336,6 +353,33 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
               </button>
             </>
           )}
+          {role !== "scanner" && (
+            <button 
+              onClick={() => setActiveTab("evaluation")}
+              className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'evaluation' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              <ClipboardSignature className="w-4 h-4" />
+              <span>Evaluación</span>
+            </button>
+          )}
+          {(role === 'superadmin' || role === 'comunicaciones') && (
+            <button 
+              onClick={() => setActiveTab("noticias")}
+              className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'noticias' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              <Image className="w-4 h-4" />
+              <span>Noticias</span>
+            </button>
+          )}
+          {(role === "scanner" || role === "superadmin") && (
+            <button 
+              onClick={() => setActiveTab("scanner")}
+              className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-[10px] md:text-xs transition-all flex-shrink-0 ${activeTab === 'scanner' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              <QrCode className="w-4 h-4" />
+              <span>Scanner</span>
+            </button>
+          )}
         </div>
 
         <div className="relative w-full md:w-auto">
@@ -349,6 +393,10 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
           />
         </div>
       </div>
+
+      {activeTab === "scanner" && (
+        <ScanEntry config={config} />
+      )}
 
       {activeTab === "list" && (
         <div className="space-y-6">
@@ -454,6 +502,10 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
                       <p className="font-bold text-primary">{r.medicalData?.bloodType || "---"}</p>
                     </div>
                     <div className="bg-gray-50 p-2 rounded-xl">
+                      <p className="text-[8px] font-bold text-gray-400 uppercase mb-0.5">Talla Franela</p>
+                      <p className="font-bold text-indigo-600 uppercase">{r.tshirtSize || "S/T"}</p>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded-xl col-span-2">
                       <p className="text-[8px] font-bold text-gray-400 uppercase mb-0.5">Alergias</p>
                       <p className="font-bold text-sm truncate">{r.medicalData?.allergies || "Ninguna"}</p>
                     </div>
@@ -681,6 +733,14 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
         </div>
       )}
 
+      {activeTab === "evaluation" && (
+        <EvaluationDashboard role={role} />
+      )}
+
+      {activeTab === "noticias" && (role === "comunicaciones" || role === "superadmin") && (
+        <ParticipantNews isSection={false} />
+      )}
+
       {activeTab === "config" && role === "superadmin" && (
         <ConfigEditor />
       )}
@@ -803,6 +863,8 @@ function StaffManager() {
               <option value="admin">Administración</option>
               <option value="ops">Operaciones</option>
               <option value="risk">Gestión de Riesgo</option>
+              <option value="comunicaciones">Comunicaciones</option>
+              <option value="scanner">Escaner</option>
               <option value="superadmin">Super Admin</option>
             </select>
           </div>
@@ -845,9 +907,11 @@ function StaffManager() {
                       member.role === 'superadmin' ? 'bg-purple-100 text-purple-600' :
                       member.role === 'admin' ? 'bg-blue-100 text-blue-600' :
                       member.role === 'risk' ? 'bg-amber-100 text-amber-600' :
+                      member.role === 'comunicaciones' ? 'bg-sky-100 text-sky-600' :
+                      member.role === 'scanner' ? 'bg-emerald-100 text-emerald-600' :
                       'bg-orange-100 text-orange-600'
                     }`}>
-                      {member.role === 'admin' ? 'Administración' : member.role === 'ops' ? 'Operaciones' : member.role === 'risk' ? 'Gestión de Riesgo' : 'Super Admin'}
+                      {member.role === 'admin' ? 'Administración' : member.role === 'ops' ? 'Operaciones' : member.role === 'risk' ? 'Gestión de Riesgo' : member.role === 'comunicaciones' ? 'Comunicaciones' : member.role === 'scanner' ? 'Escaner' : 'Super Admin'}
                     </span>
                   </td>
                   <td className="py-4 px-4 font-mono text-xs text-gray-500">{member.password}</td>
@@ -1213,24 +1277,44 @@ function ConfigEditor() {
                     ))}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 lg:col-span-1">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Fecha</label>
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block">F. Inicio</label>
                     <input 
                       type="date"
-                      value={phase.date}
-                      onChange={(e) => updatePhase(phase.id, "date", e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                      value={phase.startDate || phase.date || ""}
+                      onChange={(e) => {
+                        updatePhase(phase.id, "startDate", e.target.value);
+                        updatePhase(phase.id, "date", e.target.value);
+                      }}
+                      className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Horario</label>
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block">H. Inicio</label>
                     <input 
-                      type="text"
-                      value={phase.time}
-                      onChange={(e) => updatePhase(phase.id, "time", e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-primary/20"
-                      placeholder="Ej: 8am - 5pm"
+                      type="time"
+                      value={phase.startTime || ""}
+                      onChange={(e) => updatePhase(phase.id, "startTime", e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block">F. Cierre</label>
+                    <input 
+                      type="date"
+                      value={phase.endDate || ""}
+                      onChange={(e) => updatePhase(phase.id, "endDate", e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block">H. Cierre</label>
+                    <input 
+                      type="time"
+                      value={phase.endTime || ""}
+                      onChange={(e) => updatePhase(phase.id, "endTime", e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
                 </div>
@@ -1243,6 +1327,83 @@ function ConfigEditor() {
               <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">No se han definido fases aún</p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* SECCIONES COMPLEMENTARIAS (ADJUNTOS Y CUESTIONARIO) */}
+      <div className="bg-gray-50/50 p-6 rounded-[32px] border border-gray-100 space-y-6">
+        <h4 className="text-xs font-black text-gray-900 uppercase italic border-b pb-2">Secciones Complementarias</h4>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* ATTACHMENTS CONFIG */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-gray-700 uppercase tracking-widest pl-1">Habilitar Sección de Adjuntos</label>
+              <input 
+                type="checkbox"
+                checked={config.attachmentsActive || false}
+                onChange={(e) => setConfig({ ...config, attachmentsActive: e.target.checked })}
+                className="w-5 h-5 text-primary accent-primary rounded-xl cursor-pointer"
+              />
+            </div>
+            
+            <div className="space-y-3 pt-1">
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest pl-1">Título de Sección de Adjuntos</label>
+                <input 
+                  type="text"
+                  value={config.attachmentsTitle || ""}
+                  onChange={(e) => setConfig({ ...config, attachmentsTitle: e.target.value })}
+                  className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="Ej: Adjuntar Documentos del Grupo"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest pl-1">Descripción / Instrucciones</label>
+                <textarea 
+                  value={config.attachmentsDescription || ""}
+                  onChange={(e) => setConfig({ ...config, attachmentsDescription: e.target.value })}
+                  className="w-full h-16 p-2 rounded-lg border border-gray-200 text-xs leading-relaxed outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="Instrucciones para los grupos..."
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* QUESTIONNAIRE CONFIG */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-gray-700 uppercase tracking-widest pl-1">Habilitar Cuestionario de Evaluación</label>
+              <input 
+                type="checkbox"
+                checked={config.questionnaireActive || false}
+                onChange={(e) => setConfig({ ...config, questionnaireActive: e.target.checked })}
+                className="w-5 h-5 text-primary accent-primary rounded-xl cursor-pointer"
+              />
+            </div>
+            
+            <div className="space-y-3 pt-1">
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest pl-1">Título de Cuestionario</label>
+                <input 
+                  type="text"
+                  value={config.questionnaireTitle || ""}
+                  onChange={(e) => setConfig({ ...config, questionnaireTitle: e.target.value })}
+                  className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="Ej: Evaluación General del Evento"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest pl-1">Instrucciones del Cuestionario</label>
+                <textarea 
+                  value={config.questionnaireInstructions || ""}
+                  onChange={(e) => setConfig({ ...config, questionnaireInstructions: e.target.value })}
+                  className="w-full h-16 p-2 rounded-lg border border-gray-200 text-xs leading-relaxed outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="Instrucciones para los votantes..."
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

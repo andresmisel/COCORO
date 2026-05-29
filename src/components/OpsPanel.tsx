@@ -252,7 +252,7 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
                 <tr key={reg.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <p className="font-bold text-gray-900 uppercase text-sm">{reg.firstName} {reg.lastName}</p>
-                    <p className="text-[10px] text-gray-400 font-mono mb-1">V-{reg.idNumber}</p>
+                    <p className="text-[10px] text-gray-400 font-mono mb-1">V-{reg.idNumber} {reg.tshirtSize && `• Talla: ${reg.tshirtSize}`}</p>
                     <p className="text-xs text-primary font-medium">{reg.email}</p>
                   </td>
                   <td className="px-6 py-4">

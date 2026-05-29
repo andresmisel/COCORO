@@ -27,6 +27,7 @@ export default function VotingPlatform({ onBack }: Props) {
   const [totalVotes, setTotalVotes] = useState(0);
   const [voteCountMap, setVoteCountMap] = useState<{ [candId: string]: number }>({});
   const [voterAuditList, setVoterAuditList] = useState<any[]>([]);
+  const [eligibleVotersCount, setEligibleVotersCount] = useState<number | null>(null);
 
   useEffect(() => {
     // Fetch global configuration
@@ -78,6 +79,30 @@ export default function VotingPlatform({ onBack }: Props) {
           const auditSnap = await getDocs(collection(db, "votes_audit"));
           const audits = auditSnap.docs.map(doc => doc.data());
           setVoterAuditList(audits);
+
+          // Fetch config to check unit targets
+          const configDoc = await getDoc(doc(db, "config", "global"));
+          let targetUnit: string | undefined = undefined;
+          if (configDoc.exists()) {
+            targetUnit = (configDoc.data() as Config).votingTargetUnit;
+          }
+
+          // Fetch registrations that are approved and have "Delegado" status
+          const regSnap = await getDocs(query(
+            collection(db, "registrations"), 
+            where("opsStatus", "==", "approved"), 
+            where("votingRole", "==", "Delegado")
+          ));
+
+          const eligibleCount = regSnap.docs.filter(doc => {
+            const data = doc.data();
+            if (targetUnit && targetUnit !== "Ambos") {
+              return data.membershipType === targetUnit;
+            }
+            return true;
+          }).length;
+
+          setEligibleVotersCount(eligibleCount);
         } catch (e) {
           console.error("Error loading election results & audit:", e);
         }
@@ -276,12 +301,25 @@ export default function VotingPlatform({ onBack }: Props) {
                 <div className="text-center py-6 text-gray-400 text-xs font-bold uppercase">No se registraron candidatos para esta elección.</div>
               ) : (
                 <div className="space-y-4">
-                  <div className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between shadow-sm">
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Total Votos Consolidados</p>
-                      <p className="text-2xl font-black font-mono text-primary">{totalVotes}</p>
+                  <div className="grid grid-cols-3 gap-2 md:gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                    <div className="border-r border-gray-100 pr-1 md:pr-2">
+                      <p className="text-[9px] md:text-[10px] font-black uppercase text-gray-400 tracking-wider">Habilitados</p>
+                      <p className="text-lg md:text-2xl font-black font-mono text-gray-900 mt-1">
+                        {eligibleVotersCount !== null ? eligibleVotersCount : "..."}
+                      </p>
                     </div>
-                    <ShieldCheck className="w-8 h-8 text-green-500" />
+                    <div className="border-r border-gray-100 px-1 md:px-2">
+                      <p className="text-[9px] md:text-[10px] font-black uppercase text-gray-400 tracking-wider">Votos Emitidos</p>
+                      <p className="text-lg md:text-2xl font-black font-mono text-primary mt-1">{totalVotes}</p>
+                    </div>
+                    <div className="pl-1 md:pl-2">
+                      <p className="text-[9px] md:text-[10px] font-black uppercase text-gray-400 tracking-wider">Participación</p>
+                      <p className="text-lg md:text-2xl font-black font-mono text-emerald-600 mt-1">
+                        {eligibleVotersCount !== null && eligibleVotersCount > 0
+                          ? `${((totalVotes / eligibleVotersCount) * 100).toFixed(1)}%`
+                          : "0.0%"}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="space-y-3.5">
@@ -513,12 +551,25 @@ export default function VotingPlatform({ onBack }: Props) {
                       <div className="text-center py-6 text-gray-400 text-xs font-bold uppercase">No se registraron candidatos para esta elección.</div>
                     ) : (
                       <div className="space-y-4">
-                        <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm">
-                          <div>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Total Votos Consolidados</p>
-                            <p className="text-2xl font-black font-mono text-primary">{totalVotes}</p>
+                        <div className="grid grid-cols-3 gap-2 md:gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                          <div className="border-r border-gray-100 pr-1 md:pr-2">
+                            <p className="text-[9px] md:text-[10px] font-black uppercase text-gray-400 tracking-wider">Habilitados</p>
+                            <p className="text-lg md:text-2xl font-black font-mono text-gray-900 mt-1">
+                              {eligibleVotersCount !== null ? eligibleVotersCount : "..."}
+                            </p>
                           </div>
-                          <ShieldCheck className="w-8 h-8 text-green-500" />
+                          <div className="border-r border-gray-100 px-1 md:px-2">
+                            <p className="text-[9px] md:text-[10px] font-black uppercase text-gray-400 tracking-wider">Votos Emitidos</p>
+                            <p className="text-lg md:text-2xl font-black font-mono text-primary mt-1">{totalVotes}</p>
+                          </div>
+                          <div className="pl-1 md:pl-2">
+                            <p className="text-[9px] md:text-[10px] font-black uppercase text-gray-400 tracking-wider">Participación</p>
+                            <p className="text-lg md:text-2xl font-black font-mono text-emerald-600 mt-1">
+                              {eligibleVotersCount !== null && eligibleVotersCount > 0
+                                ? `${((totalVotes / eligibleVotersCount) * 100).toFixed(1)}%`
+                                : "0.0%"}
+                            </p>
+                          </div>
                         </div>
 
                         <div className="space-y-3.5">

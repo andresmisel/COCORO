@@ -88,6 +88,67 @@
         "votedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["candidateId", "votedAt"]
+    },
+    "GroupAttachment": {
+      "title": "Group Attachment",
+      "description": "Document or image uploaded for a scout group",
+      "type": "object",
+      "properties": {
+        "scoutGroup": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileType": { "type": "string" },
+        "fileData": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["scoutGroup", "fileName", "fileData", "createdAt"]
+    },
+    "QuestionnaireResponse": {
+      "title": "Questionnaire Response",
+      "description": "Anonymous event questionnaire evaluation response per scout group",
+      "type": "object",
+      "properties": {
+        "scoutGroup": { "type": "string" },
+        "ratingSchedule": { "type": "number" },
+        "ratingFood": { "type": "number" },
+        "ratingCocoro": { "type": "number" },
+        "ratingLocation": { "type": "number" },
+        "ratingCommunication": { "type": "number" },
+        "ratingChallenge": { "type": "number" },
+        "ratingTeamwork": { "type": "number" },
+        "ratingMystique": { "type": "number" },
+        "ratingPrice": { "type": "number" },
+        "ratingDiscussions": { "type": "number" },
+        "whatLiked": { "type": "string" },
+        "whatImprove": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "scoutGroup",
+        "ratingSchedule",
+        "ratingFood",
+        "ratingCocoro",
+        "ratingLocation",
+        "ratingCommunication",
+        "ratingChallenge",
+        "ratingTeamwork",
+        "ratingMystique",
+        "ratingPrice",
+        "ratingDiscussions",
+        "createdAt"
+      ]
+    },
+    "NewsArticle": {
+      "title": "News Article",
+      "description": "News posted by communications team role",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "authorName": { "type": "string" }
+      },
+      "required": ["title", "description", "createdAt"]
     }
   },
   "firestore": {
@@ -114,6 +175,18 @@
     "/votes_ballot/{ballotId}": {
       "schema": "VoteBallot",
       "description": "Collection containing anonymous votes"
+    },
+    "/group_attachments/{attachmentId}": {
+      "schema": "GroupAttachment",
+      "description": "Collection of group attachments (PDF or images)"
+    },
+    "/responses_questionnaire/{responseId}": {
+      "schema": "QuestionnaireResponse",
+      "description": "Collection of event evaluation survey answers"
+    },
+    "/news_articles/{articleId}": {
+      "schema": "NewsArticle",
+      "description": "Collection of news reports and bulletins"
     }
   }
 }

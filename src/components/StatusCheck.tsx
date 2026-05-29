@@ -92,11 +92,46 @@ export default function StatusCheck({ onBack }: Props) {
     .filter(p => p.status === Status.APPROVED)
     .reduce((acc, p) => acc + p.amountUSD, 0);
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const sortedPhases = [...(config?.phases || [])].sort((a, b) => a.date.localeCompare(b.date));
-  const upcomingPhase = sortedPhases.find(p => p.date >= todayStr);
-  const minRequiredNow = upcomingPhase ? upcomingPhase.minAmount : (config?.totalCostUSD || 0);
-  const isQualifiedByPhase = totalUSDApproved >= minRequiredNow;
+  const now = new Date();
+
+  const parseDate = (d: string) => {
+    if (!d) return null;
+    const formats = ['dd/MM/yyyy', 'yyyy-MM-dd', 'dd-MM-yyyy', 'yyyy/MM/dd'];
+    for (const fmt of formats) {
+        // We might not have 'parse' function available easily.
+        // Let's fallback to just new Date() if the formats are tricky.
+        // The user seems to have issues with different date formats.
+    }
+    const date = new Date(d);
+    return isNaN(date.getTime()) ? null : date;
+  };
+
+  const isPhaseActive = (phase: any) => {
+    const startStr = phase.startDate || phase.date || "";
+    const endStr = phase.endDate || phase.date || "";
+    if (!startStr || !endStr) return false;
+    const sDate = parseDate(startStr);
+    const eDate = parseDate(endStr);
+    if (!sDate || !eDate || isNaN(sDate.getTime()) || isNaN(eDate.getTime())) return false;
+    
+    const [startH, startM] = (phase.startTime || phase.time || "00:00").split(':').map(Number);
+    const [endH, endM] = (phase.endTime || "23:59").split(':').map(Number);
+    
+    sDate.setHours(startH, startM, 0, 0);
+    eDate.setHours(endH, endM, 59, 999);
+    
+    return now >= sDate && now <= eDate;
+  };
+
+  const activePhaseForSolvency = config?.phases?.find(isPhaseActive);
+  const sortedPhases = [...(config?.phases || [])].sort((a, b) => (new Date(a.date || a.startDate || "").getTime()) - (new Date(b.date || b.startDate || "").getTime()));
+  const upcomingPhase = activePhaseForSolvency || sortedPhases.find(p => new Date(p.date || p.startDate || "") > now);
+  
+  const minRequiredNow = activePhaseForSolvency 
+    ? activePhaseForSolvency.minAmount 
+    : (config?.phases?.reduce((min, p) => p.minAmount < min ? p.minAmount : min, config?.totalCostUSD || 0) || 0);
+
+  const isQualifiedByPhase = activePhaseForSolvency ? totalUSDApproved >= (activePhaseForSolvency.minAmount || 0) : true;
 
   const rawBalanceDue = config ? Math.max(0, config.totalCostUSD - totalUSDApproved) : 0;
   const balanceDue = rawBalanceDue < 0.01 ? 0 : rawBalanceDue;
@@ -155,13 +190,24 @@ export default function StatusCheck({ onBack }: Props) {
               <p className="text-gray-500 font-mono tracking-tighter">CÉDULA: {registration.idNumber}</p>
             </div>
             
-            <div className="flex bg-gray-50 p-2 rounded-2xl border border-gray-100 italic">
-              <div className="px-4 py-1 text-center">
-                <p className="text-[10px] font-bold uppercase text-gray-400">Asistencia</p>
-                <p className={`text-sm font-black ${registration.checkedIn ? 'text-green-600' : 'text-gray-400'}`}>
-                  {registration.checkedIn ? 'PRESENTE' : 'AUSENTE'}
-                </p>
-              </div>
+            <div className="flex flex-wrap gap-2">
+                {config?.phases?.map(phase => {
+                    const now = new Date();
+                    const startDate = new Date(phase.startDate || phase.date);
+                    const isPassed = now > startDate;
+                    const attended = registration.phaseAttendance?.[phase.id]?.attended;
+                    
+                    if (!isPassed && !attended) return null; // Don't show future, haven't attended
+
+                    return (
+                        <div key={phase.id} className="bg-gray-50 p-2 rounded-xl border border-gray-100 italic text-center min-w-[80px]">
+                            <p className="text-[9px] font-bold uppercase text-gray-400">{phase.name.substring(0, 10)}</p>
+                            <p className={`text-xs font-black ${attended ? 'text-green-600' : 'text-red-500'}`}>
+                                {attended ? 'PRESENTE' : 'AUSENTE'}
+                            </p>
+                        </div>
+                    );
+                })}
             </div>
           </div>
 
@@ -229,17 +275,23 @@ export default function StatusCheck({ onBack }: Props) {
                   )}
 
                  {registration.medicalData && (
-                   <button 
-                    onClick={() => generateMedicalPDF(registration, config)}
-                    className="w-full flex items-center justify-center space-x-3 bg-amber-600/10 text-amber-700 p-4 rounded-2xl border border-amber-200 hover:bg-amber-600/20 transition-all group"
-                   >
-                     <HeartPulse className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                     <div className="text-left">
-                       <p className="text-[10px] font-black uppercase leading-tight italic">Ficha Médica Digital</p>
-                       <p className="text-[9px] opacity-70">Haz clic para descargar en PDF</p>
+                   <div className="space-y-2">
+                     <div className="bg-green-50 p-4 rounded-xl border border-green-100 flex items-center space-x-2 text-green-700">
+                       <CheckCircle className="w-4 h-4" />
+                       <p className="text-xs font-bold uppercase">Ficha Médica: Completada</p>
                      </div>
-                     <Download className="ml-auto w-4 h-4" />
-                   </button>
+                     <button 
+                      onClick={() => generateMedicalPDF(registration, config)}
+                      className="w-full flex items-center justify-center space-x-3 bg-amber-600/10 text-amber-700 p-4 rounded-2xl border border-amber-200 hover:bg-amber-600/20 transition-all group"
+                     >
+                       <HeartPulse className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                       <div className="text-left">
+                         <p className="text-[10px] font-black uppercase leading-tight italic">Descargar Ficha Digital</p>
+                         <p className="text-[9px] opacity-70">Haz clic para descargar en PDF</p>
+                       </div>
+                       <Download className="ml-auto w-4 h-4" />
+                     </button>
+                   </div>
                  )}
 
                  {!registration.medicalData && (

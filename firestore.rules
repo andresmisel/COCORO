@@ -51,6 +51,21 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+
+    match /group_attachments/{attachmentId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /responses_questionnaire/{responseId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /news_articles/{articleId} {
+      allow read: if true;
+      allow write: if true;
+    }
     
     // Default deny
     match /{document=**} {
