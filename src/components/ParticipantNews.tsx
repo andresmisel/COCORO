@@ -16,7 +16,8 @@ import {
   PlusCircle, 
   AlertCircle, 
   Check, 
-  Loader2 
+  Loader2,
+  X 
 } from "lucide-react";
 
 interface Props {
@@ -29,6 +30,8 @@ export default function ParticipantNews({ onBack, isSection, role }: Props) {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
+  const [showFullImage, setShowFullImage] = useState(false);
+  const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
 
   // Press authorization states
   const [isAuthorized, setIsAuthorized] = useState(() => {
@@ -429,23 +432,34 @@ export default function ParticipantNews({ onBack, isSection, role }: Props) {
       ) : selectedArticle ? (
         /* Full Article Detail Modal/View */
         <div className="bg-white rounded-[40px] border border-gray-150 shadow-md overflow-hidden animate-in zoom-in-95 duration-300">
-          <div className="aspect-video [max-height:450px] bg-gray-50 relative overflow-hidden">
-            {selectedArticle.imageUrl ? (
-              <img src={selectedArticle.imageUrl} className="w-full h-full object-cover" alt={selectedArticle.title} />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
-                <Image className="w-16 h-16 mb-2 text-gray-300" />
-                <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Sin Imagen</span>
-              </div>
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-            <div className="absolute bottom-6 left-6 right-6 text-white text-left">
-              <span className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest mb-3 inline-block">Boletín Oficial</span>
-              <h2 className="text-2xl md:text-3xl font-black uppercase italic leading-tight">{selectedArticle.title}</h2>
+          {selectedArticle.imageUrl ? (
+            <div className="aspect-video bg-gray-50 overflow-hidden cursor-pointer">
+              <img 
+                src={selectedArticle.imageUrl} 
+                className="w-full h-full object-cover transition-transform hover:scale-[1.02]" 
+                alt={selectedArticle.title}
+                onClick={() => {
+                  setFullImageUrl(selectedArticle.imageUrl);
+                  setShowFullImage(true);
+                }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
             </div>
-          </div>
+          ) : (
+            <div className="aspect-video w-full flex flex-col items-center justify-center bg-gray-50 text-gray-300">
+              <Image className="w-16 h-16 mb-2" />
+              <span className="text-xs font-bold uppercase tracking-widest">Sin Imagen</span>
+            </div>
+          )}
 
           <div className="p-6 md:p-10 space-y-6">
+            <div>
+              <span className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest mb-3 inline-block">Boletín Oficial</span>
+              <h2 className="text-2xl md:text-3xl font-black uppercase italic leading-tight text-gray-900">{selectedArticle.title}</h2>
+            </div>
+            
             <div className="flex flex-wrap items-center justify-between gap-4 text-xs font-bold uppercase tracking-wider text-gray-400 pb-4 border-b border-gray-100">
               <div className="flex items-center space-x-2">
                 <Calendar className="w-4 h-4 text-indigo-600" />
@@ -470,23 +484,23 @@ export default function ParticipantNews({ onBack, isSection, role }: Props) {
         </div>
       ) : (
         /* News List (Bento Grid) */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {articles.map((article, idx) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {articles.map((article) => (
             <div 
               key={article.id} 
-              className={`bg-white rounded-[32px] border border-gray-150 shadow-sm overflow-hidden flex flex-col hover:shadow-xl transition-all hover:-translate-y-1 group duration-300 relative ${
-                idx === 0 ? "md:col-span-2 lg:col-span-3 lg:flex-row hover:border-indigo-100" : ""
-              }`}
+              className="bg-white rounded-[32px] border border-gray-150 shadow-sm overflow-hidden flex flex-col hover:shadow-xl transition-all hover:-translate-y-1 group duration-300 relative"
             >
               {/* Card Image */}
-              <div className={`bg-gray-50 relative overflow-hidden shrink-0 ${
-                idx === 0 ? "w-full lg:w-[45%] aspect-video lg:aspect-auto" : "aspect-video"
-              }`}>
+              <div className="bg-gray-50 relative overflow-hidden shrink-0 aspect-video">
                 {article.imageUrl ? (
                   <img 
                     src={article.imageUrl} 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                     alt={article.title} 
+                    onError={(e) => { 
+                      console.error("Error loading grid image:", article.imageUrl);
+                      (e.target as HTMLImageElement).style.display = 'none'; 
+                    }}
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 min-h-[160px]">
@@ -536,7 +550,10 @@ export default function ParticipantNews({ onBack, isSection, role }: Props) {
 
                 <div className="pt-2">
                   <button
-                    onClick={() => setSelectedArticle(article)}
+                    onClick={() => {
+                      console.log("Selecting article:", article.title);
+                      setSelectedArticle(article);
+                    }}
                     className="inline-flex items-center space-x-2 text-indigo-600 font-black uppercase text-xs tracking-wider group/btn"
                   >
                     <BookOpen className="w-4 h-4 text-indigo-600" />
@@ -547,6 +564,30 @@ export default function ParticipantNews({ onBack, isSection, role }: Props) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {/* Full Screen Image Overlay */}
+      {showFullImage && fullImageUrl && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-300 cursor-zoom-out"
+          onClick={() => setShowFullImage(false)}
+        >
+          <div 
+            className="relative cursor-default max-w-[90vw] max-h-[85vh]" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={fullImageUrl}
+              className="max-w-full max-h-[80vh] object-contain"
+              alt="Full view"
+            />
+            <button
+              className="absolute -top-12 right-0 text-white bg-white/10 p-2 rounded-full hover:bg-white/20 transition-all cursor-pointer"
+              onClick={() => setShowFullImage(false)}
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
       )}
     </div>

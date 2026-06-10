@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
+import { parse } from "date-fns";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Registration, Config } from "../types";
@@ -18,20 +19,37 @@ export default function ScanEntry({ config }: Props) {
   const qrCodeRef = useRef<Html5Qrcode | null>(null);
 
   const startScanner = async () => {
-    try {
-      const scanner = new Html5Qrcode("reader");
-      await scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        onScanSuccess,
-        (errorMessage) => console.log(errorMessage)
-      );
-      qrCodeRef.current = scanner;
-      setIsScanning(true); // Set true
-    } catch (err) {
-      console.error(err);
-      setResultMessage("No se pudo acceder a la cámara. Por favor, asegúrate de haber otorgado los permisos necesarios en la configuración de la aplicación o del navegador.");
+    // Ensure any existing scanner is stopped/cleared
+    if (qrCodeRef.current) {
+        try {
+            await qrCodeRef.current.stop();
+        } catch (e) {
+            console.error("Error stopping scanner", e);
+        }
+        qrCodeRef.current = null;
     }
+
+    setIsScanning(true);
+    setResultMessage(null);
+    setLoading(false);
+    
+    // Give the DOM a moment to remove the "hidden" class from the "reader" container
+    setTimeout(async () => {
+      try {
+        const scanner = new Html5Qrcode("reader");
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          onScanSuccess,
+          (errorMessage) => console.log(errorMessage)
+        );
+        qrCodeRef.current = scanner;
+      } catch (err) {
+        console.error(err);
+        setIsScanning(false);
+        setResultMessage("No se pudo acceder a la cámara. Por favor, asegúrate de haber otorgado los permisos necesarios en la configuración de la aplicación o del navegador.");
+      }
+    }, 200); // Increased timeout slightly
   };
 
   useEffect(() => {
@@ -62,16 +80,14 @@ export default function ScanEntry({ config }: Props) {
     const now = new Date();
     
     const parseDate = (d: string) => {
-        if (!d) return null;
-        let y, m, day;
-        if (d.includes('/')) {
-             [day, m, y] = d.split('/').map(Number);
-        } else if (d.includes('-')) {
-             [y, m, day] = d.split('-').map(Number);
-        } else {
-            return new Date(d);
-        }
-        return new Date(y, m - 1, day);
+      if (!d) return null;
+      const formats = ['dd/MM/yyyy', 'yyyy-MM-dd', 'dd-MM-yyyy', 'yyyy/MM/dd'];
+      for (const fmt of formats) {
+          const date = parse(d, fmt, new Date());
+          if (!isNaN(date.getTime())) return date;
+      }
+      const date = new Date(d);
+      return isNaN(date.getTime()) ? null : date;
     };
 
     const startDate = parseDate(startStr);
@@ -155,8 +171,8 @@ export default function ScanEntry({ config }: Props) {
         </div>
       )}
 
-      {!resultMessage && !loading && hasActivePhase && (
-        <div id="reader" className="w-full max-w-md mx-auto"></div>
+      {hasActivePhase && (
+        <div id="reader" className={`w-full max-w-md mx-auto ${(!isScanning || resultMessage || loading) ? "hidden" : "block mb-4"}`}></div>
       )}
       
       {!isScanning && !resultMessage && !loading && hasActivePhase && (
@@ -185,7 +201,13 @@ export default function ScanEntry({ config }: Props) {
       
       {resultMessage && (
         <button 
-          onClick={() => { setResultMessage(null); setScanResult(null); startScanner(); }}
+          onClick={() => {
+            setResultMessage(null);
+            setScanResult(null);
+            setTimeout(() => {
+              startScanner();
+            }, 100);
+          }}
           className="block mx-auto bg-gray-100 text-gray-600 px-6 py-2 rounded-xl font-bold uppercase transition-all hover:bg-gray-200"
         >
           Escanear otro

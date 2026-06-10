@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { parse } from "date-fns";
 import { collection, query, where, onSnapshot, doc, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Registration, Status, Payment, Config } from "../types";
@@ -98,9 +99,8 @@ export default function StatusCheck({ onBack }: Props) {
     if (!d) return null;
     const formats = ['dd/MM/yyyy', 'yyyy-MM-dd', 'dd-MM-yyyy', 'yyyy/MM/dd'];
     for (const fmt of formats) {
-        // We might not have 'parse' function available easily.
-        // Let's fallback to just new Date() if the formats are tricky.
-        // The user seems to have issues with different date formats.
+        const date = parse(d, fmt, new Date());
+        if (!isNaN(date.getTime())) return date;
     }
     const date = new Date(d);
     return isNaN(date.getTime()) ? null : date;
@@ -124,14 +124,36 @@ export default function StatusCheck({ onBack }: Props) {
   };
 
   const activePhaseForSolvency = config?.phases?.find(isPhaseActive);
-  const sortedPhases = [...(config?.phases || [])].sort((a, b) => (new Date(a.date || a.startDate || "").getTime()) - (new Date(b.date || b.startDate || "").getTime()));
-  const upcomingPhase = activePhaseForSolvency || sortedPhases.find(p => new Date(p.date || p.startDate || "") > now);
-  
-  const minRequiredNow = activePhaseForSolvency 
-    ? activePhaseForSolvency.minAmount 
-    : (config?.phases?.reduce((min, p) => p.minAmount < min ? p.minAmount : min, config?.totalCostUSD || 0) || 0);
+  const sortedPhases = [...(config?.phases || [])].sort((a, b) => {
+    const d1 = parseDate(a.startDate || a.date || "");
+    const d2 = parseDate(b.startDate || b.date || "");
+    return (d1?.getTime() || 0) - (d2?.getTime() || 0);
+  });
 
-  const isQualifiedByPhase = activePhaseForSolvency ? totalUSDApproved >= (activePhaseForSolvency.minAmount || 0) : true;
+  let minRequiredNow = 0;
+  let upcomingPhase = activePhaseForSolvency || null;
+
+  if (activePhaseForSolvency) {
+    minRequiredNow = activePhaseForSolvency.minAmount || 0;
+  } else {
+    const nextPhase = sortedPhases.find(p => {
+      const sDate = parseDate(p.startDate || p.date || "");
+      if (!sDate) return false;
+      const [sh, sm] = (p.startTime || p.time || "00:00").split(':').map(Number);
+      sDate.setHours(sh, sm, 0, 0);
+      return sDate > now;
+    });
+
+    if (nextPhase) {
+      minRequiredNow = nextPhase.minAmount || 0;
+      upcomingPhase = nextPhase;
+    } else {
+      minRequiredNow = config?.totalCostUSD || 0;
+      upcomingPhase = sortedPhases[sortedPhases.length - 1] || null;
+    }
+  }
+
+  const isQualifiedByPhase = totalUSDApproved >= minRequiredNow;
 
   const rawBalanceDue = config ? Math.max(0, config.totalCostUSD - totalUSDApproved) : 0;
   const balanceDue = rawBalanceDue < 0.01 ? 0 : rawBalanceDue;
