@@ -46,11 +46,11 @@ export default function ReportPaymentForm({ formData, setFormData, config, total
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div className="bg-white p-3 rounded-xl border border-primary/10 flex flex-col items-center justify-center space-y-1">
               <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Abonado</span>
-              <span className="text-sm font-black text-green-600 font-mono">${(totalApprovedUSD || 0).toFixed(2)}</span>
+              <span className="text-sm font-black text-green-600 font-mono">{config?.currency || "$"}{(totalApprovedUSD || 0).toFixed(2)}</span>
             </div>
             <div className="bg-white p-3 rounded-xl border border-primary/10 flex flex-col items-center justify-center space-y-1">
               <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Pendiente</span>
-              <span className="text-sm font-black text-primary font-mono">${Math.max(0, (config?.totalCostUSD || 0) - (totalApprovedUSD || 0)).toFixed(2)}</span>
+              <span className="text-sm font-black text-primary font-mono">{config?.currency || "$"}{Math.max(0, (config?.totalCostUSD || 0) - (totalApprovedUSD || 0)).toFixed(2)}</span>
             </div>
           </div>
           {(() => {
@@ -115,7 +115,7 @@ export default function ReportPaymentForm({ formData, setFormData, config, total
                   <span className="font-bold">{targetPhase.name}</span>
                 </p>
                 <p>
-                  Monto mínimo para fase: <span className="font-bold">${targetPhase.minAmount}</span>
+                  Monto mínimo para fase: <span className="font-bold">{config?.currency || "$"}{targetPhase.minAmount}</span>
                 </p>
               </div>
             ) : (
@@ -170,7 +170,7 @@ export default function ReportPaymentForm({ formData, setFormData, config, total
         
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-primary uppercase">
-            Monto ({formData.paymentMethod === PaymentMethod.TRANSFER ? 'Bs' : '$'})
+            Monto ({formData.paymentMethod === PaymentMethod.TRANSFER ? 'Bs' : (config?.currency || '$')})
           </label>
           <input
             required

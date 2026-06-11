@@ -173,7 +173,7 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
 
                     if (phase) {
                       if (totalPaid < phase.minAmount) {
-                        alert(`❌ ACCESO DENEGADO: El participante no cubre el monto mínimo para esta fase ($${totalPaid.toFixed(2)}/${phase.minAmount}).`);
+                        alert(`❌ ACCESO DENEGADO: El participante no cubre el monto mínimo para esta fase (${config?.currency || "$"}${totalPaid.toFixed(2)}/${phase.minAmount}).`);
                         return;
                       }
                       
@@ -215,7 +215,7 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
                     });
                     alert(`✅ ¡Acceso CONCEDIDO para ${regData.firstName} ${regData.lastName}!`);
                   } else if (!isCompletado) {
-                    alert(`❌ ACCESO DENEGADO: El participante no ha completado el pago (${totalPaid.toFixed(2)}/${config?.totalCostUSD || 0}).`);
+                    alert(`❌ ACCESO DENEGADO: El participante no ha completado el pago (${config?.currency || "$"}${totalPaid.toFixed(2)}/${config?.currency || "$"}${config?.totalCostUSD || 0}).`);
                   } else {
                     alert(`❌ ACCESO DENEGADO: Falta Validación Institucional para ${regData.firstName}.`);
                   }
@@ -293,7 +293,7 @@ export default function OpsPanel({ registrations, payments, config, onExportAll,
                         const isCompletado = missing <= 0;
                         return (
                           <span className={`text-[9px] font-bold uppercase ${isCompletado ? 'text-green-600' : 'text-amber-500'}`}>
-                            {isCompletado ? '💰 Completado' : `💳 Falta $${missing.toFixed(2)}`}
+                            {isCompletado ? '💰 Completado' : `💳 Falta ${config?.currency || "$"}${missing.toFixed(2)}`}
                           </span>
                         );
                       })()}

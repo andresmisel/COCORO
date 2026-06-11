@@ -26,6 +26,7 @@ export default function SuperAdminPanel({ registrations, payments, onExport, sta
     bankDetails: "", 
     cashDetails: "",
     totalCostUSD: 0,
+    currency: "$" as "$" | "€",
     registrationDeadline: "",
     photoAlbumUrl: "",
     votingActive: false,
@@ -66,6 +67,7 @@ export default function SuperAdminPanel({ registrations, payments, onExport, sta
             bankDetails: data.bankDetails || "",
             cashDetails: data.cashDetails || "",
             totalCostUSD: data.totalCostUSD || 0,
+            currency: data.currency || "$",
             registrationDeadline: data.registrationDeadline || "",
             photoAlbumUrl: data.photoAlbumUrl || "",
             votingActive: data.votingActive || false,
@@ -412,7 +414,7 @@ export default function SuperAdminPanel({ registrations, payments, onExport, sta
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
            <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Costo Evento ($)</label>
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Costo Evento</label>
             <input 
               type="number"
               disabled={!isEditingConfig}
@@ -420,6 +422,18 @@ export default function SuperAdminPanel({ registrations, payments, onExport, sta
               onChange={e => setConfig({...config, totalCostUSD: parseFloat(e.target.value)})}
               className="w-full px-4 py-2 rounded-xl border border-gray-100 text-xs font-bold outline-none focus:ring-1 focus:ring-primary disabled:bg-gray-50 transition-all font-mono"
             />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Moneda</label>
+            <select
+              disabled={!isEditingConfig}
+              value={config.currency}
+              onChange={e => setConfig({...config, currency: e.target.value as "$" | "€"})}
+              className="w-full px-4 py-2 rounded-xl border border-gray-100 text-xs font-bold outline-none focus:ring-1 focus:ring-primary disabled:bg-gray-50 transition-all"
+            >
+              <option value="$">$ (Dólar)</option>
+              <option value="€">€ (Euro)</option>
+            </select>
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Fecha Límite</label>
@@ -431,8 +445,8 @@ export default function SuperAdminPanel({ registrations, payments, onExport, sta
               className="w-full px-4 py-2 rounded-xl border border-gray-100 text-xs font-bold outline-none focus:ring-1 focus:ring-primary disabled:bg-gray-50 transition-all"
             />
           </div>
-          <div className="md:col-span-2 flex items-end">
-            <p className="text-[10px] text-gray-400 italic">Configure el costo del evento y la fecha límite para nuevas inscripciones.</p>
+          <div className="md:col-span-1 flex items-end">
+            <p className="text-[10px] text-gray-400 italic">Configure el costo del evento y la moneda.</p>
           </div>
         </div>
 

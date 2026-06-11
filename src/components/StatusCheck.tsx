@@ -246,16 +246,16 @@ export default function StatusCheck({ onBack }: Props) {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold uppercase opacity-60">Total Acumulado (Aprobado)</p>
-                    <p className="text-4xl font-black italic">${totalUSDApproved.toFixed(2)}</p>
+                    <p className="text-4xl font-black italic">{config?.currency || "$"}{totalUSDApproved.toFixed(2)}</p>
                   </div>
                   <div className="flex justify-between items-end border-t border-white/20 pt-4">
                     <div>
                       <p className="text-[10px] font-bold uppercase opacity-60">Restante por Pagar</p>
-                      <p className="text-xl font-bold italic">${balanceDue.toFixed(2)}</p>
+                      <p className="text-xl font-bold italic">{config?.currency || "$"}{balanceDue.toFixed(2)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-bold uppercase opacity-60">Meta Total</p>
-                      <p className="text-lg font-bold opacity-80">${(config?.totalCostUSD || 0).toFixed(2)}</p>
+                      <p className="text-lg font-bold opacity-80">{config?.currency || "$"}{(config?.totalCostUSD || 0).toFixed(2)}</p>
                     </div>
                   </div>
                 </div>
@@ -339,7 +339,7 @@ export default function StatusCheck({ onBack }: Props) {
                       <CheckCircle className="text-blue-500 w-6 h-6 mt-0.5 shrink-0" />
                       <div>
                         <p className="text-blue-900 font-bold text-sm uppercase">¡Solvente para {upcomingPhase?.name || 'Evento'}!</p>
-                        <p className="text-blue-700 text-xs mt-1">Has cubierto el monto mínimo requerido a la fecha (${minRequiredNow}). Tu credencial está activa.</p>
+                        <p className="text-blue-700 text-xs mt-1">Has cubierto el monto mínimo requerido a la fecha ({config?.currency || "$"}{minRequiredNow}). Tu credencial está activa.</p>
                       </div>
                     </div>
                  ) : balanceDue <= 0 && !registration.medicalData ? (
@@ -438,7 +438,7 @@ export default function StatusCheck({ onBack }: Props) {
                     <p className="font-bold text-sm uppercase text-gray-400 tracking-widest">Código Bloqueado</p>
                     <div className="space-y-1">
                       {!isQualifiedByPhase && balanceDue > 0 && (
-                        <p className="text-[10px] text-amber-500 font-bold uppercase tracking-tighter">Falta monto para {upcomingPhase?.name || 'Inscripción'} (${(minRequiredNow - totalUSDApproved).toFixed(2)})</p>
+                        <p className="text-[10px] text-amber-500 font-bold uppercase tracking-tighter">Falta monto para {upcomingPhase?.name || 'Inscripción'} ({config?.currency || "$"}{(minRequiredNow - totalUSDApproved).toFixed(2)})</p>
                       )}
                       {registration.opsStatus !== Status.APPROVED && (
                         <p className="text-[10px] text-blue-500 font-bold uppercase tracking-tighter">Falta Validación Institucional</p>

@@ -98,6 +98,7 @@ export interface Config {
   eventDate: string;
   eventLocation: string;
   totalCostUSD: number;
+  currency: "$" | "€";
   registrationDeadline: string;
   scoutUnit: string;
   eventName: string;
