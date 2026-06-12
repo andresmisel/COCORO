@@ -407,6 +407,7 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
               searchTerm={searchTerm}
               staffName={staffName}
               role={role}
+              config={config}
               onExport={() => exportToExcel(filteredRegistrations, "Pagos_Comunidad_Rover", true)}
             />
           )}
@@ -693,7 +694,7 @@ export default function StaffDashboard({ role, staffName, onLogout }: Props) {
           {/* Main Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard title="Total Inscritos" value={registrations.length} color="primary" />
-            <StatCard title="Pagos Aprobados ($)" value={totalUSDApproved.toFixed(2)} isUSD color="green" />
+            <StatCard title={`Pagos Aprobados (${config?.currency || "$"})`} value={totalUSDApproved.toFixed(2)} isUSD currency={config?.currency || "$"} color="green" />
             <StatCard title="Membresías Vigentes" value={registrations.filter(r => r.opsStatus === Status.APPROVED).length} color="blue" />
             <StatCard title="Asistentes (General)" value={registrations.filter(r => r.checkedIn).length} color="amber" />
           </div>
@@ -1047,7 +1048,7 @@ function ProgressPanel({ registrations, payments, config }: { registrations: Reg
   );
 }
 
-function StatCard({ title, value, color, isUSD }: { title: string, value: any, color: string, isUSD?: boolean }) {
+function StatCard({ title, value, color, isUSD, currency = "$" }: { title: string, value: any, color: string, isUSD?: boolean, currency?: string }) {
   const colors: any = {
     primary: "border-primary/20 text-primary bg-primary/5",
     green: "border-green-100 text-green-600 bg-green-50",
@@ -1059,7 +1060,7 @@ function StatCard({ title, value, color, isUSD }: { title: string, value: any, c
     <div className={`p-8 rounded-3xl border-2 transition-all hover:scale-[1.02] ${colors[color]}`}>
       <h3 className="text-xs font-bold uppercase tracking-widest opacity-70 mb-2">{title}</h3>
       <p className="text-4xl sm:text-5xl font-black italic">
-        {isUSD && <span className="text-2xl mr-1">$</span>}
+        {isUSD && <span className="text-2xl mr-1">{currency}</span>}
         {value}
       </p>
     </div>

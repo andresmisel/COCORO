@@ -18,12 +18,19 @@ export default function StatusCheck({ onBack }: Props) {
   const [registration, setRegistration] = useState<Registration | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
+  const [configLoading, setConfigLoading] = useState(true);
   const [searched, setSearched] = useState(false);
 
   useEffect(() => {
     const fetchConfig = async () => {
-      const snap = await getDoc(doc(db, "config", "global"));
-      if (snap.exists()) setConfig(snap.data() as Config);
+      try {
+        const snap = await getDoc(doc(db, "config", "global"));
+        if (snap.exists()) setConfig(snap.data() as Config);
+      } catch (err) {
+        console.error("Failed to fetch config:", err);
+      } finally {
+        setConfigLoading(false);
+      }
     };
     fetchConfig();
   }, []);
@@ -157,6 +164,15 @@ export default function StatusCheck({ onBack }: Props) {
 
   const rawBalanceDue = config ? Math.max(0, config.totalCostUSD - totalUSDApproved) : 0;
   const balanceDue = rawBalanceDue < 0.01 ? 0 : rawBalanceDue;
+
+  if (configLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <p className="text-gray-400 font-bold uppercase text-xs tracking-widest">Cargando configuración...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

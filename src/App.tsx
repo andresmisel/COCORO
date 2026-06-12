@@ -267,7 +267,7 @@ export default function App() {
                         <h3 className="text-xl font-black text-gray-900 uppercase italic mb-2 leading-tight">{phase.name}</h3>
                         <div className="flex items-center space-x-2 mb-4">
                           <span className="px-2 py-0.5 bg-gray-100 rounded-md text-[9px] font-black uppercase text-gray-500 tracking-wider">Acumulado Mínimo:</span>
-                          <span className="text-sm font-black text-primary font-mono">${phase.minAmount.toFixed(2)}</span>
+                          <span className="text-sm font-black text-primary font-mono">{config?.currency || "$"}{phase.minAmount.toFixed(2)}</span>
                         </div>
                         
                         <div 

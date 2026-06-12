@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Registration, Status, PaymentMethod, Payment } from "../types";
+import { Registration, Status, PaymentMethod, Payment, Config } from "../types";
 import { updateDoc, doc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Download, CheckCircle, XCircle, MessageSquare, Eye, Trash2 } from "lucide-react";
@@ -13,9 +13,10 @@ interface Props {
   searchTerm?: string;
   staffName: string;
   role: string;
+  config: Config | null;
 }
 
-export default function AdminPanel({ registrations, payments, onExport, searchTerm, staffName, role }: Props) {
+export default function AdminPanel({ registrations, payments, onExport, searchTerm, staffName, role, config }: Props) {
   const [obsId, setObsId] = useState<string | null>(null);
   const [obsText, setObsText] = useState("");
   const [viewProof, setViewProof] = useState<Payment | null>(null);
@@ -110,7 +111,7 @@ export default function AdminPanel({ registrations, payments, onExport, searchTe
                             Eq. USD
                           </span>
                           <span className={`font-mono text-xs font-bold ${p.paymentMethod === PaymentMethod.TRANSFER ? 'text-primary' : 'text-green-600'}`}>
-                            ${Number(p.amountUSD || 0).toFixed(2)}
+                            {config?.currency || "$"}{Number(p.amountUSD || 0).toFixed(2)}
                           </span>
                         </div>
                         {p.proofUrl && (
