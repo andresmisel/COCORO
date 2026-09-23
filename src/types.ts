@@ -160,9 +160,10 @@ export interface QuestionnaireQuestion {
 export interface QuestionnaireResponse {
   id?: string;
   scoutGroup: string;
-  responses: { key: string, rating: number }[];
+  responses: { key: string; rating: number; label?: string }[];
   whatLiked: string;
   whatImprove: string;
   createdAt: string;
+  [key: string]: any;
 }
 

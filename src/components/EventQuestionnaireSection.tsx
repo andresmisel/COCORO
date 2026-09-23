@@ -93,7 +93,17 @@ export default function EventQuestionnaireSection({ config }: Props) {
       if (snap.empty) {
         setQuestions(DEFAULT_QUESTIONS);
       } else {
-        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuestionnaireQuestion));
+        const list = snap.docs.map((doc, idx) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            key: data.key || doc.id || `rating_${idx}`,
+            label: data.label || `Pregunta ${idx + 1}`,
+            colorClass: data.colorClass || "text-amber-500 fill-amber-400",
+            order: data.order ?? idx,
+            ...data,
+          } as QuestionnaireQuestion;
+        });
         setQuestions(list);
       }
       setLoadingQuestions(false);
@@ -132,7 +142,8 @@ export default function EventQuestionnaireSection({ config }: Props) {
 
     // Check if any rating is 0
     for (const q of questions) {
-      if (!ratings[q.key] || ratings[q.key] === 0) {
+      const k = q.key || q.id;
+      if (!ratings[k] || ratings[k] === 0) {
         setError(`Por favor califica la pregunta: "${q.label}"`);
         return;
       }
@@ -144,15 +155,25 @@ export default function EventQuestionnaireSection({ config }: Props) {
     try {
       const response: QuestionnaireResponse = {
         scoutGroup: selectedGroup,
-        responses: questions.map(q => ({ key: q.key, rating: ratings[q.key] })),
+        responses: questions.map((q, idx) => {
+          const k = q.key || q.id || `rating_${idx}`;
+          return {
+            key: k,
+            label: q.label,
+            rating: ratings[k] || 0,
+          };
+        }),
         whatLiked,
         whatImprove,
         createdAt: new Date().toISOString(),
       };
 
       // Assign flat fields for backward compatibility with classic reports
-      questions.forEach(q => {
-        (response as any)[q.key] = ratings[q.key];
+      questions.forEach((q, idx) => {
+        const k = q.key || q.id || `rating_${idx}`;
+        const val = ratings[k] || 0;
+        (response as any)[k] = val;
+        if (q.id) (response as any)[q.id] = val;
       });
 
       await addDoc(collection(db, "responses_questionnaire"), response);
@@ -170,7 +191,10 @@ export default function EventQuestionnaireSection({ config }: Props) {
     }
   };
 
-  const isFormIncomplete = !selectedGroup || questions.some(q => !ratings[q.key] || ratings[q.key] === 0);
+  const isFormIncomplete = !selectedGroup || questions.some(q => {
+    const k = q.key || q.id;
+    return !ratings[k] || ratings[k] === 0;
+  });
 
   if (loadingQuestions) return <div className="flex justify-center py-12"><Loader2 className="animate-spin w-8 h-8 text-primary" /></div>;
 
