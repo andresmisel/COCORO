@@ -37,7 +37,9 @@ import {
   Image,
   HeartPulse,
   UserCheck,
-  ClipboardSignature
+  ClipboardSignature,
+  Settings,
+  X
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { handleFirestoreError, OperationType } from "../lib/error-handler";
@@ -48,6 +50,7 @@ import OpsPanel from "./OpsPanel";
 import SuperAdminPanel from "./SuperAdminPanel";
 import EvaluationDashboard from "./EvaluationDashboard";
 import ParticipantNews from "./ParticipantNews";
+import QuestionManager from "./QuestionManager";
 import { generateMedicalPDF } from "../lib/pdf-utils";
 import { StaffMember } from "../types";
 
@@ -1085,6 +1088,7 @@ function ConfigEditor() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showQuestionModal, setShowQuestionModal] = useState(false);
 
   const addPhase = () => {
     const newPhase: EventPhase = {
@@ -1403,10 +1407,36 @@ function ConfigEditor() {
                   placeholder="Instrucciones para los votantes..."
                 />
               </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowQuestionModal(true)}
+                  className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center space-x-2 transition-all cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>Gestionar Preguntas del Cuestionario ⚙️</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {showQuestionModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 md:p-8 relative animate-in fade-in zoom-in duration-200">
+            <button
+              type="button"
+              onClick={() => setShowQuestionModal(false)}
+              className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <QuestionManager />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-4">

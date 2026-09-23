@@ -1144,9 +1144,18 @@ export default function SuperAdminPanel({ registrations, payments, onExport, sta
               <h3 className="font-black text-lg text-gray-900 uppercase italic mt-2">Respuestas de Cuestionarios COCORO</h3>
               <p className="text-xs text-gray-400">Analiza las evaluaciones detalladas de cada elemento del evento y descarga el reporte en formato CSV.</p>
             </div>
-            {questionnaires.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3">
               <button
-                onClick={() => {
+                type="button"
+                onClick={() => setView("questions")}
+                className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-indigo-600/10 hover:-translate-y-0.5 cursor-pointer"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Configurar Preguntas ⚙️</span>
+              </button>
+              {questionnaires.length > 0 && (
+                <button
+                  onClick={() => {
                   const headers = [
                     "ID",
                     "Grupo Scout",
@@ -1209,6 +1218,7 @@ export default function SuperAdminPanel({ registrations, payments, onExport, sta
                 <span>Descargar Resultados (.CSV)</span>
               </button>
             )}
+            </div>
           </div>
 
           {questionnairesLoading ? (
@@ -1421,6 +1431,10 @@ export default function SuperAdminPanel({ registrations, payments, onExport, sta
             </div>
           )}
         </div>
+      )}
+
+      {view === "questions" && (
+        <QuestionManager />
       )}
 
       {/* Proof Viewing Modal */}

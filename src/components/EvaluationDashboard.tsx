@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { collection, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { QuestionnaireResponse, StaffRole } from "../types";
-import { Download, Loader2, ClipboardCheck, Star, Trash2 } from "lucide-react";
+import { Download, Loader2, ClipboardCheck, Star, Trash2, Settings, BarChart3 } from "lucide-react";
 import { handleFirestoreError, OperationType } from "../lib/error-handler";
+import QuestionManager from "./QuestionManager";
 
 interface Props {
   role: StaffRole;
@@ -12,6 +13,7 @@ interface Props {
 export default function EvaluationDashboard({ role }: Props) {
   const [questionnaires, setQuestionnaires] = useState<QuestionnaireResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [subTab, setSubTab] = useState<"results" | "questions">("results");
 
   useEffect(() => {
     setLoading(true);
@@ -53,8 +55,37 @@ export default function EvaluationDashboard({ role }: Props) {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Header & Download Options */}
-      <div className="bg-white p-6 md:p-8 rounded-[32px] border border-gray-150 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {role === "superadmin" && (
+        <div className="flex bg-gray-100 p-1.5 rounded-2xl w-fit">
+          <button
+            type="button"
+            onClick={() => setSubTab("results")}
+            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-xs transition-all ${
+              subTab === "results" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>Resultados y Métricas</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab("questions")}
+            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold uppercase text-xs transition-all ${
+              subTab === "questions" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            <span>Gestionar Preguntas ⚙️</span>
+          </button>
+        </div>
+      )}
+
+      {subTab === "questions" && role === "superadmin" ? (
+        <QuestionManager />
+      ) : (
+        <>
+          {/* Header & Download Options */}
+          <div className="bg-white p-6 md:p-8 rounded-[32px] border border-gray-150 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <span className="text-[10px] bg-primary/10 text-primary font-black uppercase px-3 py-1 rounded-full tracking-wider">
             Evaluaciones del Personal 📝
@@ -332,6 +363,8 @@ export default function EvaluationDashboard({ role }: Props) {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

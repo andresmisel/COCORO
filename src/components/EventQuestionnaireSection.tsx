@@ -10,6 +10,79 @@ interface Props {
   config: Config;
 }
 
+const DEFAULT_QUESTIONS: QuestionnaireQuestion[] = [
+  {
+    id: "default_1",
+    key: "ratingSchedule",
+    label: "¿Cómo evalúas el cumplimiento del cronograma y los horarios del evento?",
+    colorClass: "text-amber-500 fill-amber-400",
+    order: 0,
+  },
+  {
+    id: "default_2",
+    key: "ratingFood",
+    label: "¿Qué te pareció la calidad y cantidad de la alimentación?",
+    colorClass: "text-orange-500 fill-orange-500",
+    order: 1,
+  },
+  {
+    id: "default_3",
+    key: "ratingCocoro",
+    label: "¿Qué tan fácil y amigable te resultó el proceso de inscripción y registro a través del Sistema COCORO?",
+    colorClass: "text-indigo-500 fill-indigo-400",
+    order: 2,
+  },
+  {
+    id: "default_4",
+    key: "ratingLocation",
+    label: "¿Las instalaciones o espacios elegidos fueron adecuados?",
+    colorClass: "text-emerald-500 fill-emerald-400",
+    order: 3,
+  },
+  {
+    id: "default_5",
+    key: "ratingCommunication",
+    label: "¿La comunicación previa y durante el evento por parte del equipo organizador fue clara y estuvo disponible a tiempo?",
+    colorClass: "text-teal-500 fill-teal-400",
+    order: 4,
+  },
+  {
+    id: "default_6",
+    key: "ratingChallenge",
+    label: "¿Las actividades del evento desafiaron tus capacidades y conocimientos?",
+    colorClass: "text-purple-500 fill-purple-500",
+    order: 5,
+  },
+  {
+    id: "default_7",
+    key: "ratingTeamwork",
+    label: "¿Las actividades fomentaron el trabajo en equipo y la integración entre los Clanes?",
+    colorClass: "text-pink-500 fill-pink-400",
+    order: 6,
+  },
+  {
+    id: "default_8",
+    key: "ratingMystique",
+    label: "¿La \"Mística del evento\" cumplió con tus expectativas?",
+    colorClass: "text-yellow-500 fill-yellow-400",
+    order: 7,
+  },
+  {
+    id: "default_9",
+    key: "ratingPrice",
+    label: "¿Consideras que la cuota de participación del evento se justificó plenamente con lo que recibiste?",
+    colorClass: "text-blue-500 fill-blue-400",
+    order: 8,
+  },
+  {
+    id: "default_10",
+    key: "ratingDiscussions",
+    label: "¿Tuviste la oportunidad de debatir, dar tu punto de vista y ser escuchado durante los foros o actividades?",
+    colorClass: "text-cyan-500 fill-cyan-400",
+    order: 9,
+  },
+];
+
 export default function EventQuestionnaireSection({ config }: Props) {
   const [questions, setQuestions] = useState<QuestionnaireQuestion[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(true);
@@ -17,8 +90,16 @@ export default function EventQuestionnaireSection({ config }: Props) {
   useEffect(() => {
     const q = query(collection(db, "questionnaire_questions"), orderBy("order", "asc"));
     const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuestionnaireQuestion));
-      setQuestions(list);
+      if (snap.empty) {
+        setQuestions(DEFAULT_QUESTIONS);
+      } else {
+        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuestionnaireQuestion));
+        setQuestions(list);
+      }
+      setLoadingQuestions(false);
+    }, (err) => {
+      console.error("Error loading questions", err);
+      setQuestions(DEFAULT_QUESTIONS);
       setLoadingQuestions(false);
     });
     return () => unsub();
@@ -68,6 +149,11 @@ export default function EventQuestionnaireSection({ config }: Props) {
         whatImprove,
         createdAt: new Date().toISOString(),
       };
+
+      // Assign flat fields for backward compatibility with classic reports
+      questions.forEach(q => {
+        (response as any)[q.key] = ratings[q.key];
+      });
 
       await addDoc(collection(db, "responses_questionnaire"), response);
       setSuccess(true);
