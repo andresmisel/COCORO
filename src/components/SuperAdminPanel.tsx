@@ -5,6 +5,7 @@ import { db } from "../lib/firebase";
 import { Trash2, Edit3, Save, X, Download, AlertTriangle, Settings, Loader2, CreditCard, User, Eye, Vote, ShieldAlert, FileText, ClipboardCheck, Star } from "lucide-react";
 import { handleFirestoreError, OperationType } from "../lib/error-handler";
 import ProofViewer from "./ProofViewer";
+import QuestionManager from "./QuestionManager";
 
 interface Props {
   registrations: Registration[];
@@ -38,7 +39,7 @@ export default function SuperAdminPanel({ registrations, payments, onExport, sta
   });
   const [isEditingConfig, setIsEditingConfig] = useState(false);
   const [configLoading, setConfigLoading] = useState(false);
-  const [view, setView] = useState<"users" | "payments" | "voting" | "attachments" | "questionnaires">("users");
+  const [view, setView] = useState<"users" | "payments" | "voting" | "attachments" | "questionnaires" | "questions">("users");
 
   const [attachments, setAttachments] = useState<GroupAttachment[]>([]);
   const [attachmentsLoading, setAttachmentsLoading] = useState(false);
@@ -596,6 +597,13 @@ export default function SuperAdminPanel({ registrations, payments, onExport, sta
           >
             <ClipboardCheck className="w-3 h-3" />
             <span>Cuestionarios 📝</span>
+          </button>
+          <button 
+            onClick={() => setView("questions")}
+            className={`flex-1 lg:flex-none flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${view === 'questions' ? 'bg-white text-primary shadow-sm' : 'text-gray-500'}`}
+          >
+            <Settings className="w-3 h-3" />
+            <span>Preguntas ⚙️</span>
           </button>
         </div>
 

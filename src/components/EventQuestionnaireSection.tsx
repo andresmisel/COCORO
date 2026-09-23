@@ -1,8 +1,8 @@
-import React, { useState } from "react";
-import { collection, addDoc } from "firebase/firestore";
+import React, { useState, useEffect } from "react";
+import { collection, addDoc, query, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { SCOUT_GROUPS } from "../constants";
-import { Config, QuestionnaireResponse } from "../types";
+import { Config, QuestionnaireResponse, QuestionnaireQuestion } from "../types";
 import { Star, CheckCircle2, Loader2, AlertCircle, ClipboardSignature } from "lucide-react";
 import { handleFirestoreError, OperationType } from "../lib/error-handler";
 
@@ -10,86 +10,23 @@ interface Props {
   config: Config;
 }
 
-const QUESTIONS = [
-  {
-    key: "ratingSchedule" as const,
-    label: "¿Cómo evalúas el cumplimiento del cronograma y los horarios del evento?",
-    colorClass: "text-amber-500 fill-amber-400",
-  },
-  {
-    key: "ratingFood" as const,
-    label: "¿Qué te pareció la calidad y cantidad de la alimentación?",
-    colorClass: "text-orange-500 fill-orange-500",
-  },
-  {
-    key: "ratingCocoro" as const,
-    label: "¿Qué tan fácil y amigable te resultó el proceso de inscripción y registro a través del Sistema COCORO?",
-    colorClass: "text-indigo-500 fill-indigo-400",
-  },
-  {
-    key: "ratingLocation" as const,
-    label: "¿Las instalaciones o espacios elegidos fueron adecuados?",
-    colorClass: "text-emerald-500 fill-emerald-400",
-  },
-  {
-    key: "ratingCommunication" as const,
-    label: "¿La comunicación previa y durante el evento por parte del equipo organizador fue clara y estuvo disponible a tiempo?",
-    colorClass: "text-teal-500 fill-teal-400",
-  },
-  {
-    key: "ratingChallenge" as const,
-    label: "¿Las actividades del evento desafiaron tus capacidades y conocimientos?",
-    colorClass: "text-purple-500 fill-purple-500",
-  },
-  {
-    key: "ratingTeamwork" as const,
-    label: "¿Las actividades fomentaron el trabajo en equipo y la integración entre los Clanes?",
-    colorClass: "text-pink-500 fill-pink-400",
-  },
-  {
-    key: "ratingMystique" as const,
-    label: "¿La \"Mística del evento\" cumplió con tus expectativas?",
-    colorClass: "text-yellow-500 fill-yellow-400",
-  },
-  {
-    key: "ratingPrice" as const,
-    label: "¿Consideras que la cuota de participación del evento se justificó plenamente con lo que recibiste?",
-    colorClass: "text-blue-500 fill-blue-400",
-  },
-  {
-    key: "ratingDiscussions" as const,
-    label: "¿Tuviste la oportunidad de debatir, dar tu punto de vista y ser escuchado durante los foros o actividades?",
-    colorClass: "text-cyan-500 fill-cyan-400",
-  },
-];
-
 export default function EventQuestionnaireSection({ config }: Props) {
-  const [selectedGroup, setSelectedGroup] = useState("");
-  const [ratings, setRatings] = useState({
-    ratingSchedule: 0,
-    ratingFood: 0,
-    ratingCocoro: 0,
-    ratingLocation: 0,
-    ratingCommunication: 0,
-    ratingChallenge: 0,
-    ratingTeamwork: 0,
-    ratingMystique: 0,
-    ratingPrice: 0,
-    ratingDiscussions: 0,
-  });
+  const [questions, setQuestions] = useState<QuestionnaireQuestion[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(true);
 
-  const [hovers, setHovers] = useState({
-    ratingSchedule: 0,
-    ratingFood: 0,
-    ratingCocoro: 0,
-    ratingLocation: 0,
-    ratingCommunication: 0,
-    ratingChallenge: 0,
-    ratingTeamwork: 0,
-    ratingMystique: 0,
-    ratingPrice: 0,
-    ratingDiscussions: 0,
-  });
+  useEffect(() => {
+    const q = query(collection(db, "questionnaire_questions"), orderBy("order", "asc"));
+    const unsub = onSnapshot(q, (snap) => {
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuestionnaireQuestion));
+      setQuestions(list);
+      setLoadingQuestions(false);
+    });
+    return () => unsub();
+  }, []);
+
+  const [selectedGroup, setSelectedGroup] = useState("");
+  const [ratings, setRatings] = useState<{ [key: string]: number }>({});
+  const [hovers, setHovers] = useState<{ [key: string]: number }>({});
 
   const [whatLiked, setWhatLiked] = useState("");
   const [whatImprove, setWhatImprove] = useState("");
@@ -97,11 +34,11 @@ export default function EventQuestionnaireSection({ config }: Props) {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const setRatingVal = (key: keyof typeof ratings, val: number) => {
+  const setRatingVal = (key: string, val: number) => {
     setRatings((prev) => ({ ...prev, [key]: val }));
   };
 
-  const setHoverVal = (key: keyof typeof hovers, val: number) => {
+  const setHoverVal = (key: string, val: number) => {
     setHovers((prev) => ({ ...prev, [key]: val }));
   };
 
@@ -113,11 +50,9 @@ export default function EventQuestionnaireSection({ config }: Props) {
     }
 
     // Check if any rating is 0
-    const keys = Object.keys(ratings) as Array<keyof typeof ratings>;
-    for (const key of keys) {
-      if (ratings[key] === 0) {
-        const question = QUESTIONS.find((q) => q.key === key);
-        setError(`Por favor califica la pregunta: "${question?.label}"`);
+    for (const q of questions) {
+      if (!ratings[q.key] || ratings[q.key] === 0) {
+        setError(`Por favor califica la pregunta: "${q.label}"`);
         return;
       }
     }
@@ -128,7 +63,7 @@ export default function EventQuestionnaireSection({ config }: Props) {
     try {
       const response: QuestionnaireResponse = {
         scoutGroup: selectedGroup,
-        ...ratings,
+        responses: questions.map(q => ({ key: q.key, rating: ratings[q.key] })),
         whatLiked,
         whatImprove,
         createdAt: new Date().toISOString(),
@@ -138,18 +73,7 @@ export default function EventQuestionnaireSection({ config }: Props) {
       setSuccess(true);
       // Reset form
       setSelectedGroup("");
-      setRatings({
-        ratingSchedule: 0,
-        ratingFood: 0,
-        ratingCocoro: 0,
-        ratingLocation: 0,
-        ratingCommunication: 0,
-        ratingChallenge: 0,
-        ratingTeamwork: 0,
-        ratingMystique: 0,
-        ratingPrice: 0,
-        ratingDiscussions: 0,
-      });
+      setRatings({});
       setWhatLiked("");
       setWhatImprove("");
     } catch (err) {
@@ -160,7 +84,9 @@ export default function EventQuestionnaireSection({ config }: Props) {
     }
   };
 
-  const isFormIncomplete = !selectedGroup || Object.values(ratings).some((r) => r === 0);
+  const isFormIncomplete = !selectedGroup || questions.some(q => !ratings[q.key] || ratings[q.key] === 0);
+
+  if (loadingQuestions) return <div className="flex justify-center py-12"><Loader2 className="animate-spin w-8 h-8 text-primary" /></div>;
 
   return (
     <div className="bg-gradient-to-br from-indigo-50/20 to-purple-50/10 p-8 md:p-12 rounded-[40px] border border-gray-150 shadow-sm mt-16 max-w-3xl mx-auto text-left" id="event-questionnaire-section">
@@ -212,16 +138,16 @@ export default function EventQuestionnaireSection({ config }: Props) {
           </select>
         </div>
 
-        {/* 10 Star Rating Questions */}
+        {/* Dynamic Star Rating Questions */}
         <div className="space-y-4">
-          {QUESTIONS.map((q, idx) => {
-            const currentRating = ratings[q.key];
-            const currentHover = hovers[q.key];
+          {questions.map((q, idx) => {
+            const currentRating = ratings[q.key] || 0;
+            const currentHover = hovers[q.key] || 0;
 
             return (
               <div key={q.key} className="bg-white p-5 md:p-6 rounded-3xl border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-gray-200 transition-all">
                 <div className="space-y-1.5 max-w-lg">
-                  <span className="text-[10px] font-black text-primary uppercase tracking-widest block">Pregunta {idx + 1} de 10</span>
+                  <span className="text-[10px] font-black text-primary uppercase tracking-widest block">Pregunta {idx + 1} de {questions.length}</span>
                   <label className="text-xs font-bold text-gray-800 tracking-wide block leading-relaxed">{q.label}</label>
                 </div>
                 <div className="flex space-x-1.5 shrink-0">

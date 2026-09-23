@@ -51,13 +51,15 @@ export default function AdminPanel({ registrations, payments, onExport, searchTe
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
         <h3 className="font-bold uppercase italic text-gray-500 text-[10px] md:text-xs tracking-widest pl-2">Control de Reportes (Individual)</h3>
-        <button 
-          onClick={onExport}
-          className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-primary text-white px-4 py-2 rounded-xl font-bold uppercase text-xs hover:bg-primary-dark transition-all shadow-lg shadow-primary/20"
-        >
-          <Download className="w-4 h-4" />
-          <span>Exportar Historial</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={onExport}
+            className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-primary text-white px-4 py-2 rounded-xl font-bold uppercase text-xs hover:bg-primary-dark transition-all shadow-lg shadow-primary/20"
+          >
+            <Download className="w-4 h-4" />
+            <span>Exportar Historial</span>
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">

@@ -62,6 +62,11 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    match /questionnaire_questions/{questionId} {
+      allow read: if true;
+      allow write: if true; // Restrict to SuperAdmin in future
+    }
+
     match /news_articles/{articleId} {
       allow read: if true;
       allow write: if true;

@@ -50,7 +50,7 @@ export default function StatusCheck({ onBack }: Props) {
       }
     }, (error) => {
       setLoading(false);
-      handleFirestoreError(error, OperationType.LIST, "registrations");
+      console.error("Firestore listener error:", error);
     });
 
     // Listen for Payments
@@ -61,7 +61,7 @@ export default function StatusCheck({ onBack }: Props) {
       setLoading(false);
     }, (error) => {
       setLoading(false);
-      handleFirestoreError(error, OperationType.LIST, "payments");
+      console.error("Firestore listener error:", error);
     });
 
     return () => {

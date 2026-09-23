@@ -149,19 +149,18 @@ export interface GroupAttachment {
   createdAt: string;
 }
 
+export interface QuestionnaireQuestion {
+  id: string;
+  key: string;
+  label: string;
+  colorClass: string;
+  order: number;
+}
+
 export interface QuestionnaireResponse {
   id?: string;
   scoutGroup: string;
-  ratingSchedule: number;      // q1: cumplimiento del cronograma y los horarios del evento
-  ratingFood: number;          // q2: calidad y cantidad de la alimentación
-  ratingCocoro: number;        // q3: proceso de inscripción y registro a través de COCORO
-  ratingLocation: number;      // q4: instalaciones o espacios elegidos adecuados
-  ratingCommunication: number; // q5: comunicación previa y durante el evento clara y a tiempo
-  ratingChallenge: number;     // q6: actividades desafiaron capacidades y conocimientos
-  ratingTeamwork: number;      // q7: actividades fomentaron trabajo en equipo e integración
-  ratingMystique: number;      // q8: Mística del evento cumplió expectativas
-  ratingPrice: number;         // q9: cuota de participación se justificó plenamente
-  ratingDiscussions: number;   // q10: oportunidad de debatir, dar su punto de vista y ser escuchado
+  responses: { key: string, rating: number }[];
   whatLiked: string;
   whatImprove: string;
   createdAt: string;
